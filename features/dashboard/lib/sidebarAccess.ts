@@ -5,7 +5,12 @@
  */
 
 type SidebarList = { path: string; isHidden?: boolean | null }
-type SidebarUser = { role?: { canAccessDashboard?: boolean | null } | null } | null | undefined
+type SidebarUser = { role?: { name?: string | null; canAccessDashboard?: boolean | null } | null } | null | undefined
+
+/** Raw model tooling is for the technical Admin role; owners and staff use platform screens. */
+export function canUseModels(user: SidebarUser) {
+  return user?.role?.canAccessDashboard === true && user.role.name === 'Admin'
+}
 
 /** Only an explicit false hides navigation; an unknown user is left to the middleware. */
 export function canUseDashboardNav(user: SidebarUser) {
@@ -13,7 +18,7 @@ export function canUseDashboardNav(user: SidebarUser) {
 }
 
 export function visibleSidebarLists<T extends SidebarList>(lists: T[], user: SidebarUser): T[] {
-  if (!canUseDashboardNav(user)) return []
+  if (!canUseModels(user)) return []
   return lists.filter((list) => !list.isHidden)
 }
 
@@ -32,4 +37,17 @@ export function visiblePlatformItems<T extends { href: string }>(
     const slug = item.href.split('/platform/')[1]?.split(/[/?#]/)[0]
     return !slug || !hiddenPaths.has(slug)
   })
+}
+
+/**
+ * Items that name the permissions they need (`requires`) are hidden from a role that holds none of them.
+ * A user whose permissions are unknown keeps the item; the page itself still refuses with a 404.
+ */
+export function visibleByPermission<T extends { requires?: string[] }>(
+  items: T[],
+  user: { role?: Record<string, unknown> | null } | null | undefined
+): T[] {
+  const role = user?.role
+  if (!role) return items
+  return items.filter((item) => !item.requires?.length || item.requires.some((p) => role[p] === true))
 }

@@ -1,0 +1,29 @@
+import { gql } from '../../lib/gql';
+import { roleFlags } from '../../lib/guard';
+import { grossReaders } from '@/features/keystone/access';
+import { money, when } from '../../lib/format';
+import { FilterTabs, Page, Row, Rows } from '../../components/ui-bits';
+
+const STATUSES = [['', 'All'], ['on_sale', 'On sale'], ['presale', 'Presale'], ['announced', 'Announced'], ['hold', 'Hold'], ['completed', 'Completed'], ['settling', 'Settling'], ['settled', 'Settled'], ['postponed', 'Postponed']];
+
+export async function EventListPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const { status } = await searchParams;
+  const can = await roleFlags(...grossReaders);
+  const seesGross = grossReaders.some((p) => can[p]);
+  const now = new Date().toISOString();
+  const data = await gql(`query($where: EventWhereInput!) { events(where: $where, orderBy: [{ showAt: asc }], take: 100) { id title status showAt room { name timezone } sold open ${seesGross ? 'gross' : ''} } }`, { where: status ? { status: { equals: status } } : {} });
+  // Upcoming shows first; past shows remain available below and through status filters.
+  const events = [...data.events].sort((a: any, b: any) => {
+    const ap = !a.showAt || a.showAt < now; const bp = !b.showAt || b.showAt < now;
+    if (ap !== bp) return ap ? 1 : -1;
+    return ap ? String(b.showAt).localeCompare(String(a.showAt)) : String(a.showAt).localeCompare(String(b.showAt));
+  });
+  return (
+    <Page title="Events">
+      <FilterTabs base="/dashboard/platform/events" current={status} options={STATUSES.map(([value, label]) => ({ value, label }))} />
+      <Rows empty="No events.">
+        {events.map((e: any) => <Row key={e.id} href={`/dashboard/platform/events/${e.id}`} title={e.title} status={e.status} meta={`${e.room?.name} · ${when(e.showAt, e.room?.timezone)}`} right={<>{e.sold} sold · {e.open} open{seesGross ? ` · ${money(e.gross)}` : ''}</>} />)}
+      </Rows>
+    </Page>
+  );
+}

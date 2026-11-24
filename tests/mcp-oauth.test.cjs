@@ -71,7 +71,7 @@ function fakePrisma() {
   return prisma;
 }
 
-const STAFF_ROLE = { id: 'r1', name: 'Admin', canCreateTodos: true, canManageAllTodos: true, canSeeOtherPeople: true,
+const STAFF_ROLE = { id: 'r1', name: 'Admin', canManageEvents: true, canSeeOtherPeople: true,
   canEditOtherPeople: true, canManagePeople: true, canManageRoles: true, canAccessDashboard: true };
 const USERS = {
   customer: { id: 'customer', name: 'Cass Customer', email: 'cass@example.invalid', role: null },
@@ -264,9 +264,8 @@ test('a customer token is the customer: no staff role, and staff mutations are r
   const { Role } = { Role: { create: permissions.canManageRoles, update: permissions.canManageRoles } };
   assert.equal(Role.create({ session }), false);
   assert.equal(permissions.canManagePeople({ session }), false);
-  assert.equal(permissions.canManageAllTodos({ session }), false);
+  assert.equal(permissions.canManageEvents({ session }), false);
   assert.deepEqual(plain(rules.canUpdatePeople({ session })), { id: { equals: 'customer' } });
-  assert.deepEqual(plain(rules.canManageTodos({ session })), { assignedTo: { id: { equals: 'customer' } } });
 
   const staff = await connect(h, 'staff');
   const staffSession = await sessionFor(h, staff.tokens.access_token);
@@ -280,9 +279,9 @@ test('scopes only narrow: read-only tokens cannot mutate; no token can touch cre
   const { parse } = require('graphql');
   const problem = (source, scopes, variables) => h.guard.mcpOperationProblem({ document: parse(source), variables, scopes });
   const write = ['mcp:read', 'mcp:write'];
-  assert.equal(problem('{ todos { id } }', ['mcp:read']), null);
-  assert.equal(problem('mutation { createTodo(data: { label: "x" }) { id } }', ['mcp:read']), h.guard.READ_ONLY_MESSAGE);
-  assert.equal(problem('mutation { createTodo(data: { label: "x" }) { id } }', write), null);
+  assert.equal(problem('{ events { id } }', ['mcp:read']), null);
+  assert.equal(problem('mutation { createRoom(data: { name: "x" }) { id } }', ['mcp:read']), h.guard.READ_ONLY_MESSAGE);
+  assert.equal(problem('mutation { createRoom(data: { name: "x" }) { id } }', write), null);
   for (const source of [
     'mutation { endSession }',
     'mutation { authenticateUserWithPassword(email: "a", password: "b") { __typename } }',
@@ -306,7 +305,7 @@ test('scopes only narrow: read-only tokens cannot mutate; no token can touch cre
     return stopped;
   };
   assert.equal(run({ itemId: 'staff' }, 'mutation { endSession }'), null);
-  assert.match(run({ itemId: 'customer', mcp: { clientId: 'c', scopes: ['mcp:read'] } }, 'mutation { createTodo(data: {}) { id } }').errors[0].message, /read-only/);
+  assert.match(run({ itemId: 'customer', mcp: { clientId: 'c', scopes: ['mcp:read'] } }, 'mutation { createRoom(data: {}) { id } }').errors[0].message, /read-only/);
 });
 
 test('unticking "Allow changes" grants mcp:read only', async () => {
@@ -427,4 +426,20 @@ test('the sign-in screen signs people in through Keystone and returns to the sam
   // Account creation follows the starter's existing PUBLIC_SIGNUPS_ALLOWED switch (off here).
   const signup = await h.routes.authorizePOST(h.keystoneContext, req(`/oauth/authorize?${query}`, { method: 'POST', form: { intent: 'signup', email: 'n@example.invalid', password: 'pw', name: 'N' } }));
   assert.equal(signup.status, 403);
+});
+
+test('isSameOrigin: Origin "null" is decided by Sec-Fetch-Site, everything else stays strict', () => {
+  const h = harness();
+  const { isSameOrigin } = h.load('features/keystone/mcp-oauth/http.ts');
+  const issuer = 'https://shop.example';
+  const check = headers => isSameOrigin(new Request(`${issuer}/oauth/authorize`, { method: 'POST', headers }), issuer);
+  assert.equal(check({ origin: issuer }), true, 'matching Origin');
+  assert.equal(check({ origin: 'https://evil.example' }), false, 'foreign Origin');
+  assert.equal(check({ origin: 'https://evil.example', 'sec-fetch-site': 'same-origin' }), false, 'foreign Origin is never rescued by Sec-Fetch-Site');
+  assert.equal(check({ origin: 'null', 'sec-fetch-site': 'same-origin' }), true, 'Origin null + same-origin');
+  assert.equal(check({ origin: 'null', 'sec-fetch-site': 'cross-site' }), false, 'Origin null + cross-site');
+  assert.equal(check({ origin: 'null', 'sec-fetch-site': 'same-site' }), false, 'Origin null + same-site');
+  assert.equal(check({ origin: 'null' }), false, 'Origin null + no Sec-Fetch-Site');
+  assert.equal(check({ 'sec-fetch-site': 'same-origin' }), true, 'no Origin + same-origin');
+  assert.equal(check({}), false, 'no Origin and no Sec-Fetch-Site');
 });

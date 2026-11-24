@@ -2,10 +2,13 @@ import { createAuth } from "@keystone-6/auth";
 import { config } from "@keystone-6/core";
 import "dotenv/config";
 import { models } from "./models";
+import { permissionNames } from './access';
 import { statelessSessions } from "@keystone-6/core/session";
 import { extendGraphqlSchema } from "./mutations";
 import { sendPasswordResetEmail } from "./lib/mail";
 import { withMcpBearerSessions } from "./mcp-oauth/session";
+import { pooledDatabaseUrl } from './database-url';
+import { throwKeystonePrismaErrors } from './lib/keystonePrismaErrors';
 
 const databaseURL = process.env.DATABASE_URL || "file:./keystone.db";
 
@@ -33,21 +36,18 @@ const { withAuth } = createAuth({
       role: {
         create: {
           name: "Admin",
-          canCreateTodos: true,
-          canManageAllTodos: true,
-          canSeeOtherPeople: true,
-          canEditOtherPeople: true,
-          canManagePeople: true,
-          canManageRoles: true,
-          canAccessDashboard: true,
+          ...Object.fromEntries(permissionNames.map(name => [name, true])),
         },
       },
     },
   },
   passwordResetLink: {
     async sendToken(args) {
-      // send the email
-      await sendPasswordResetEmail(args.token, args.identity);
+      // Staff reset on the dashboard, customers on the storefront; the email carries the store's name.
+      const sudo = args.context.sudo();
+      const user = await sudo.prisma.user.findUnique({ where: { id: String(args.itemId) }, select: { role: { select: { canAccessDashboard: true } } } });
+      const settings = await sudo.prisma.storeSettings.findFirst({ select: { name: true } });
+      await sendPasswordResetEmail(args.token, args.identity, { customer: !user?.role?.canAccessDashboard, storeName: settings?.name || undefined });
     },
   },
   sessionData: `
@@ -56,13 +56,7 @@ const { withAuth } = createAuth({
     role {
       id
       name
-      canCreateTodos
-      canManageAllTodos
-      canSeeOtherPeople
-      canEditOtherPeople
-      canManagePeople
-      canManageRoles
-      canAccessDashboard
+      ${permissionNames.join('\n')}
     }
   `,
 });
@@ -71,7 +65,9 @@ export default withAuth(
   config({
     db: {
       provider: "postgresql",
-      url: databaseURL,
+      url: pooledDatabaseUrl(databaseURL),
+      // Keystone returns failed queries as values; this makes them throw so transactions roll back.
+      extendPrismaClient: throwKeystonePrismaErrors,
     },
     lists: models,
     storage: {

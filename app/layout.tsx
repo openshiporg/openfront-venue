@@ -12,10 +12,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Next x Keystone Starter",
-  description: "Next, Keystone, and Tailwind Starter Template",
-};
+import { keystoneClient } from "@/features/dashboard/lib/keystoneClient";
+
+async function storeName() {
+  const r = await keystoneClient<{ storeLogo: { name: string } }>("{ storeLogo { name } }");
+  return (r.success && r.data.storeLogo?.name) || "Venue";
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const name = await storeName();
+  return { title: name, description: `Tickets for live shows at ${name}.` };
+}
 
 export default function RootLayout({
   children,

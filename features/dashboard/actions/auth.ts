@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { removeAuthToken } from '@/features/dashboard/lib/cookies';
 import { revalidatePath } from 'next/cache';
 import { PUBLIC_REQUEST_ERROR, safeErrorSummary, sanitizeDashboardRedirect } from '../lib/security';
+import { permissionNames } from '@/features/keystone/access';
 import { passwordResetEmailAvailable, RESET_EMAIL_UNAVAILABLE } from '../lib/authFlow';
 
 // Legacy storefront callers may pass a password in previous state; never return it.
@@ -149,31 +150,22 @@ export async function resetPassword(
 }
 
 export async function getAuthenticatedUser() {
-  const query = `
+  return keystoneClient(`
     query AuthenticatedUser {
       authenticatedItem {
         ... on User {
-          id
-          email
-          name
-          role {
-            canAccessDashboard
-          }
+          id email name onboardingStatus
+          role { name ${permissionNames.join(' ')} }
         }
       }
+      eventsCount: eventsCount
+      storeSettingsRecords(take: 1) { name }
     }
-  `;
-
-  const response = await keystoneClient(query);
-
-  return response;
+  `);
 }
 
 export async function getAuthHeaders() {
-  'use server';
   const cookieStore = await cookies();
   const keystoneCookie = cookieStore.get('keystonejs-session')?.value;
-  return keystoneCookie ? {
-    Cookie: `keystonejs-session=${keystoneCookie}`
-  } : {};
+  return keystoneCookie ? { Cookie: `keystonejs-session=${keystoneCookie}` } : {};
 }

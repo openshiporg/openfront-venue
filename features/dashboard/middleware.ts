@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { NextRequest } from "next/server";
-import { getGraphQLEndpoint } from "@/features/dashboard/lib/getBaseUrl";
+import { getServerGraphQLTarget } from "@/features/dashboard/lib/getBaseUrl";
 import { GraphQLClient } from 'graphql-request';
 import { safeErrorSummary, sanitizeDashboardRedirect } from './lib/security';
 import { isDashboardRoute, publicSignUpsAllowed } from './lib/authFlow';
@@ -8,11 +8,15 @@ import { isDashboardRoute, publicSignUpsAllowed } from './lib/authFlow';
 const basePath = "/dashboard";
 
 // Create a GraphQL client for middleware with explicit headers
-async function createMiddlewareGraphQLClient(headers: Record<string, string>): Promise<GraphQLClient> {
-  const endpoint = await getGraphQLEndpoint();
+async function createMiddlewareGraphQLClient(
+  headers: Record<string, string>,
+  sourceHeaders?: { get(name: string): string | null },
+): Promise<GraphQLClient> {
+  const { endpoint, fetch: internalFetch } = await getServerGraphQLTarget(sourceHeaders);
   return new GraphQLClient(endpoint, {
     credentials: 'include',
     redirect: 'error',
+    ...(internalFetch ? { fetch: internalFetch } : {}),
     headers,
   });
 }
@@ -30,7 +34,7 @@ export async function checkInitStatus(request: NextRequest) {
   };
 
   try {
-    const client = await createMiddlewareGraphQLClient(headers);
+    const client = await createMiddlewareGraphQLClient(headers, request.headers);
     const data = await client.request(query) as { redirectToInit: boolean };
     return data.redirectToInit;
   } catch (error) {
@@ -47,6 +51,7 @@ export async function getAuthenticatedUser(request: NextRequest) {
         ... on User {
           id
           role {
+            name
             canAccessDashboard
           }
         }
@@ -60,7 +65,7 @@ export async function getAuthenticatedUser(request: NextRequest) {
   };
 
   try {
-    const client = await createMiddlewareGraphQLClient(headers);
+    const client = await createMiddlewareGraphQLClient(headers, request.headers);
     const data = await client.request(query) as { 
       authenticatedItem: any; 
       redirectToInit: boolean 
@@ -110,6 +115,11 @@ export async function handleDashboardRoutes(
     return NextResponse.redirect(new URL(basePath, request.url));
   }
 
+  // Public sign-up is for ticket buyers; staff are invited by a venue admin.
+  if (isDashboardRoute(pathname, 'signup')) {
+    return NextResponse.redirect(new URL('/account/sign-up', request.url));
+  }
+
   // Handle unauthenticated users
   if (!user && !isSigninRoute && !isSignupRoute && !isResetRoute) {
     const signinUrl = new URL(`${basePath}/signin`, request.url);
@@ -124,6 +134,19 @@ export async function handleDashboardRoutes(
     if (fromPath && !fromPath.includes("no-access")) {
       return NextResponse.redirect(new URL(fromPath, request.url));
     }
+    return NextResponse.redirect(new URL(basePath, request.url));
+  }
+
+  // Ticket buyers have accounts but no staff role: their home is My tickets on the storefront.
+  if (user && !user.role) {
+    return NextResponse.redirect(new URL('/account', request.url));
+  }
+
+  // Generic model pages are Admin-only, including direct URLs. Platform actions
+  // retain their own capability checks, so this does not grant or remove API access.
+  const section = pathname.slice(basePath.length + 1).split('/')[0];
+  const publicSections = ['', 'platform', 'signin', 'signup', 'reset', 'init', 'no-access'];
+  if (user && !publicSections.includes(section) && user.role?.name !== 'Admin') {
     return NextResponse.redirect(new URL(basePath, request.url));
   }
 

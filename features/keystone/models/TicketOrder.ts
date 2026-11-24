@@ -1,0 +1,41 @@
+import { list, graphql } from '@keystone-6/core';
+import { text, integer, checkbox, json, select, relationship, timestamp, virtual } from '@keystone-6/core/fields';
+import { trackingFields } from './trackingFields';
+import { readAccess, commandAccess, catalogAccess, permissions } from '../access';
+
+export const TicketOrder = list({
+ access: readAccess('canManageOrders', 'canIssueRefunds'),
+ 
+ fields: {
+  orderNumber: text({ isIndexed: 'unique', db: { isNullable: true } }),
+  guestEmail: text({}),
+  guestName: text({}),
+  // Test and QA orders are hidden from every staff list and report, never deleted (fleet rule).
+  hiddenAt: timestamp({ access: { create: () => false, update: () => false }, ui: { createView: { fieldMode: 'hidden' }, itemView: { fieldMode: 'read' } } }),
+  secretKey: text({ access: { read: () => false, create: () => false, update: () => false } }),
+  subtotalCents: integer({ defaultValue: 0 }),
+  serviceFeesCents: integer({ defaultValue: 0 }),
+  facilityFeesCents: integer({ defaultValue: 0 }),
+  taxCents: integer({ defaultValue: 0 }),
+  discountCents: integer({ defaultValue: 0 }),
+  totalCents: integer({ defaultValue: 0 }),
+  refundedCents: integer({ defaultValue: 0 }),
+  ageAttested: checkbox({ defaultValue: false }),
+  status: select({ type: 'string', options: ['pending_payment', 'paid', 'partially_refunded', 'refunded', 'cancelled', 'comp'], defaultValue: 'pending_payment', access: { update: () => false } }),
+  source: select({ type: 'string', options: ['online', 'box_office', 'comp', 'presale'], defaultValue: 'online', access: { update: () => false } }),
+  customer: relationship({ ref: 'User.ticketOrder_customer', many: false }),
+  event: relationship({ ref: 'Event.ticketOrder_event', many: false }),
+  paymentCollection: relationship({ ref: 'PaymentCollection.ticketOrder_paymentCollection', many: false }),
+  inventoryHold_order: relationship({ ref: 'InventoryHold.order', many: true }),
+  ticketOrderLine_order: relationship({ ref: 'TicketOrderLine.order', many: true }),
+  ticket_order: relationship({ ref: 'Ticket.order', many: true }),
+  currencyCode: text({ defaultValue: 'USD', validation: { match: { regex: /^[A-Z]{3}$/, explanation: 'ISO 4217 currency code' } } }),
+  payments: relationship({ ref: 'Payment.order', many: true }),
+  promoRedemptions: relationship({ ref: 'PromoRedemption.order', many: true }),
+  discountSnapshot: json(),
+  // Set when the confirmation email with the tickets was handed to the mail server.
+  confirmationSentAt: timestamp({ access: { create: () => false, update: () => false } }),
+  confirmationMessageId: text({ access: { create: () => false, update: () => false } }),
+  ...trackingFields,
+ }
+});

@@ -5,7 +5,7 @@
 import { getAuthHeaders } from '@/features/dashboard/lib/cookies';
 import { GraphQLClient } from 'graphql-request';
 import { PUBLIC_REQUEST_ERROR, publicGraphQLErrorMessage, safeErrorSummary } from './security';
-import { getGraphQLEndpoint } from '@/features/dashboard/lib/getBaseUrl';
+import { getServerGraphQLTarget } from '@/features/dashboard/lib/getBaseUrl';
 
 // Define response type for keystoneClient
 export type KeystoneResponse<T = any> =
@@ -16,13 +16,43 @@ export type KeystoneResponse<T = any> =
  * Create a GraphQL client with authentication headers
  */
 async function createGraphQLClient(): Promise<GraphQLClient> {
-  const endpoint = await getGraphQLEndpoint();
+  const { endpoint, fetch: internalFetch } = await getServerGraphQLTarget();
   const authHeaders = await getAuthHeaders();
   return new GraphQLClient(endpoint, {
     credentials: 'include',
     redirect: 'error',
+    ...(internalFetch ? { fetch: internalFetch } : {}),
     headers: authHeaders || {},
   });
+}
+
+/**
+ * Run a query whose root fields are independent (e.g. one count per list) and keep every field that resolved.
+ * A field that failed (access denied, a transient database error) comes back as null and its path is listed in
+ * failedFields, instead of one failure discarding the whole response.
+ */
+export async function keystonePartialQuery<T extends Record<string, unknown>>(
+  query: string,
+  variables: Record<string, unknown> = {},
+): Promise<{ success: true; data: Partial<T>; failedFields: string[] } | { success: false; error: string }> {
+  try {
+    const { endpoint, fetch: internalFetch } = await getServerGraphQLTarget();
+    const authHeaders = await getAuthHeaders();
+    const client = new GraphQLClient(endpoint, {
+      credentials: 'include',
+      redirect: 'error',
+      errorPolicy: 'all',
+      ...(internalFetch ? { fetch: internalFetch } : {}),
+      headers: authHeaders || {},
+    });
+    const result = await client.rawRequest<T>(query, variables);
+    const failedFields = (result.errors ?? []).map(error => String(error.path?.[0] ?? '')).filter(Boolean);
+    if (!result.data) return { success: false, error: PUBLIC_REQUEST_ERROR };
+    return { success: true, data: result.data, failedFields };
+  } catch (error) {
+    console.error("Error fetching GraphQL data:", safeErrorSummary(error));
+    return { success: false, error: publicGraphQLErrorMessage(error) };
+  }
 }
 
 /**
@@ -74,7 +104,7 @@ async function _fetchGraphQLWithFiles(
   variables: Record<string, unknown> = {}
 ): Promise<any> {
   try {
-    const endpoint = await getGraphQLEndpoint();
+    const { endpoint, fetch: internalFetch } = await getServerGraphQLTarget();
     const authHeaders = await getAuthHeaders();
 
     // Clone the variables to avoid modifying the original
@@ -115,7 +145,7 @@ async function _fetchGraphQLWithFiles(
     }
 
     // Send the multipart request
-    const response = await fetch(endpoint, {
+    const response = await (internalFetch ?? fetch)(endpoint, {
       method: "POST",
       headers,
       credentials: "include",
