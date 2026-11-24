@@ -15,6 +15,9 @@ export const Promoter = list({
     notes: text({ ui: { displayMode: 'textarea' } }),
     dateHold_promoter: relationship({ ref: 'DateHold.promoter', many: true }),
     inquiry_promoter: relationship({ ref: 'Inquiry.promoter', many: true }),
+    venueDeal_promoter: relationship({ ref: 'VenueDeal.promoter', many: true }),
+    event_promoter: relationship({ ref: 'Event.promoter', many: true }),
+    document_promoter: relationship({ ref: 'Document.promoter', many: true }),
     ...trackingFields,
   },
 });

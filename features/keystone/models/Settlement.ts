@@ -28,6 +28,10 @@ export const Settlement = list({
   promoterNetCents: integer({ defaultValue: 0 }),
   computedSnapshot: json(),
   approvals: json(),
+  // artist: Concerts' artist settlement. promoter: the renter or co-promoter statement built from the venue deal.
+  party: select({ type: 'string', options: ['artist', 'promoter'], defaultValue: 'artist', access: { update: () => false } }),
+  venueDeal: relationship({ ref: 'VenueDeal.settlement_venueDeal', many: false }),
+  balanceDuePromoterCents: integer({ defaultValue: 0 }),
   status: select({ type: 'string', options: ['draft', 'reviewed', 'signed_promoter', 'signed_artist', 'final', 'void'], defaultValue: 'draft', access: { update: () => false } }),
   event: relationship({ ref: 'Event.settlement_event', many: false }),
   previousVersion: relationship({ ref: 'Settlement.settlement_previousVersion', many: false }),

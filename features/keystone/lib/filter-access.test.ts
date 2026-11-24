@@ -31,7 +31,7 @@ const probes: Array<{ query: string; hiddenFrom: string[] }> = [
   { query: '{ ticketsCount(where: { line: { totalCents: { gte: $N } } }) }', hiddenFrom: ['Door Staff'] },
   { query: '{ eventsCount(where: { eventExpense_event: { some: { actualCents: { gte: $N } } } }) }', hiddenFrom: ['Box Office', 'Door Staff'] },
   { query: '{ eventsCount(where: { merchSales_event: { some: { softGrossCents: { gte: $N } } } }) }', hiddenFrom: ['Booker', 'Box Office', 'Door Staff'] },
-  { query: '{ eventsCount(where: { promoter: { email: { startsWith: "m$N" } } }) }', hiddenFrom: ['Booker', 'Box Office', 'Door Staff', 'Settlement Manager'] },
+  { query: '{ eventsCount(where: { bookedBy: { email: { startsWith: "m$N" } } }) }', hiddenFrom: ['Booker', 'Box Office', 'Door Staff', 'Settlement Manager'] },
   { query: '{ events(orderBy: [{ gross: desc }]) { id } }', hiddenFrom: [] },
 ];
 

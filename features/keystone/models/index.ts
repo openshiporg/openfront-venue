@@ -13,6 +13,8 @@ import { EventArtist } from './EventArtist';
 import { DateHold } from './DateHold';
 import { Promoter } from './Promoter';
 import { Inquiry } from './Inquiry';
+import { VenueDeal, HouseExpense, PromoterPayment } from './VenueDeal';
+import { Document } from './Document';
 import { Offer } from './Offer';
 import { EventExpense } from './EventExpense';
 import { PriceLevel } from './PriceLevel';
@@ -43,7 +45,7 @@ import { IdempotencyKey } from './IdempotencyKey';
 import { ManagerApproval } from './ManagerApproval';
 import { CashDrawer } from './CashDrawer';
 import { filterFollowsRead } from '../filter-access';
-const baseModels = { User, Role, OAuthApp, OAuthToken, Room, SeatingChart, ChartSection, Seat, Agency, Artist, Event, EventArtist, DateHold, Promoter, Inquiry, Offer, EventExpense, PriceLevel, PriceLevelPhase, SeatInventory, ProductionHold, InventoryHold, PromoCode, PromoRedemption, TicketOrder, TicketOrderLine, Ticket, ScanEvent, MerchSales, BarSales, Settlement, SettlementLine, ArtistPayment, AuditEvent, StoreSettings, PaymentProvider, PaymentCollection, PaymentSession, Payment, Refund, PaymentWebhookEvent, IdempotencyKey, ManagerApproval, CashDrawer };
+const baseModels = { User, Role, OAuthApp, OAuthToken, Room, SeatingChart, ChartSection, Seat, Agency, Artist, Event, EventArtist, DateHold, Promoter, Inquiry, VenueDeal, HouseExpense, PromoterPayment, Document, Offer, EventExpense, PriceLevel, PriceLevelPhase, SeatInventory, ProductionHold, InventoryHold, PromoCode, PromoRedemption, TicketOrder, TicketOrderLine, Ticket, ScanEvent, MerchSales, BarSales, Settlement, SettlementLine, ArtistPayment, AuditEvent, StoreSettings, PaymentProvider, PaymentCollection, PaymentSession, Payment, Refund, PaymentWebhookEvent, IdempotencyKey, ManagerApproval, CashDrawer };
 const allModels = filterFollowsRead(baseModels as any) as typeof baseModels;
 // Narrow the sidebar and create links per role from each list's own operation access.
 type Gate = (args: { session?: unknown }) => unknown;

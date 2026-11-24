@@ -136,7 +136,7 @@ export function operator(operation: string) {
         if (!old) throw new Error('Settlement not found');
         const { id, createdAt, updatedAt, settlementLine_settlement: lines, ...data } = old;
         const snapshot = { ...old.computedSnapshot, correction: { previousHash: old.hash, reason: input.reason, amountCents: input.amountCents, approvedById: input.approvedById } };
-        const row = await tx.settlement.create({ data: { ...data, version: old.version + 1, previousVersionId: old.id, status: 'draft', approvals: {}, computedSnapshot: snapshot, hash: canonicalDigest((snapshot)), artistTotalCents: old.artistTotalCents + input.amountCents, balanceDueArtistCents: old.balanceDueArtistCents + input.amountCents, promoterNetCents: old.promoterNetCents - input.amountCents } });
+        const row = await tx.settlement.create({ data: { ...data, version: await nextSettlementVersion(tx, old.eventId), previousVersionId: old.id, status: 'draft', approvals: {}, computedSnapshot: snapshot, hash: canonicalDigest((snapshot)), ...(old.party === 'promoter' ? { balanceDuePromoterCents: (old.balanceDuePromoterCents || 0) + input.amountCents } : { artistTotalCents: old.artistTotalCents + input.amountCents, balanceDueArtistCents: old.balanceDueArtistCents + input.amountCents, promoterNetCents: old.promoterNetCents - input.amountCents }) } });
         for (const line of lines) { const { id, createdAt, updatedAt, settlementId, ...copy } = line; await tx.settlementLine.create({ data: { ...copy, settlementId: row.id } }); }
         await tx.settlementLine.create({ data: { settlementId: row.id, kind: 'adjustment', label: input.reason, amountCents: input.amountCents, reason: input.reason, approvedById: input.approvedById, sourceRef: old.id } });
         await audit('Settlement', row.id, { hash: row.hash }, input.reason); return { id: row.id, status: 'draft', hash: row.hash };
@@ -144,10 +144,15 @@ export function operator(operation: string) {
       if (operation === 'signSettlement') {
         const row = await tx.settlement.findUnique({ where: { id: input.settlementId } });
         if (!row || canonicalDigest((row.computedSnapshot)) !== row.hash) throw new Error('Settlement snapshot hash mismatch');
-        const transitions: Record<string,string> = { draft: 'reviewed', reviewed: 'signed_promoter', signed_promoter: 'signed_artist', signed_artist: 'final' };
+        // Artist statement: promoter then artist sign. Promoter statement: the promoter signs, then a second venue user makes it final.
+        const transitions: Record<string,string> = row.party === 'promoter'
+          ? { draft: 'reviewed', reviewed: 'signed_promoter', signed_promoter: 'final' }
+          : { draft: 'reviewed', reviewed: 'signed_promoter', signed_promoter: 'signed_artist', signed_artist: 'final' };
         const next = transitions[row.status]; if (!next) throw new Error('Settlement cannot be signed');
         if (next === 'signed_artist' && row.approvals?.signed_promoter?.actorId === actor) throw new Error('Artist signature requires a different user');
+        if (row.party === 'promoter' && next === 'final' && row.approvals?.signed_promoter?.actorId === actor) throw new Error('The venue countersignature needs a different user');
         await transition(tx, 'settlement', row.id, row.status, next, actor, '', { approvals: { ...row.approvals, [next]: { actorId: actor, at: new Date().toISOString(), hash: row.hash } } });
+        if (row.party === 'promoter' && next === 'final' && row.balanceDuePromoterCents === 0) await settlePromoterDeal(tx, row, actor);
         return { id: row.id, status: next, hash: row.hash };
       }
       if (operation === 'recordArtistPayment') {
@@ -200,8 +205,10 @@ export async function validateApprover(tx: any, id: string, actor: string) {
 export async function buildSettlement(tx: any, eventId: string, actor: string) {
   const event = await tx.event.findUnique({ where: { id: eventId } });
   if (!event || !['completed','settling'].includes(event.status)) throw new Error('Completed event required');
-  const old = await tx.settlement.findFirst({ where: { eventId }, orderBy: { version: 'desc' } });
+  // The artist and promoter statements share the event's version sequence; each replaces only its own party's draft.
+  const old = await tx.settlement.findFirst({ where: { eventId, party: 'artist' }, orderBy: { version: 'desc' } });
   if (old && ['signed_promoter','signed_artist','final'].includes(old.status)) throw new Error('Signed settlement is frozen; create an approved adjustment');
+  const nextVersion = await nextSettlementVersion(tx, eventId);
   const offers = await tx.offer.findMany({ where: { eventId, status: { in: ['accepted','contracted','settled'] } }, orderBy: { id: 'asc' } });
   if (!offers.length) throw new Error('Accepted artist deal required');
   const orders = await tx.ticketOrder.findMany({ where: { eventId, hiddenAt: null, status: { in: ['paid','partially_refunded','comp'] } }, include: { ticketOrderLine_order: true } });
@@ -225,7 +232,7 @@ export async function buildSettlement(tx: any, eventId: string, actor: string) {
   const totals = { ...first, artistGuaranteeCents: sum('artistGuaranteeCents'), artistOverageCents: sum('artistOverageCents'), artistTotalCents: sum('artistTotalCents'), balanceDueArtistCents: sum('balanceDueArtistCents'), promoterNetCents: first.netBoxOfficeCents-first.totalExpensesCents-sum('artistTotalCents')+sum('merchVenueShareCents') };
   const snapshot = { version: 1, eventId, figures, orderIds: orders.map((o: any)=>o.id), expenses: expenses.map((e: any)=>({id:e.id,actualCents:e.actualCents,isCapped:e.isCapped})), totals };
   const hash = canonicalDigest((snapshot));
-  const data = { eventId, status: 'draft', version: old ? old.version+1 : 1, previousVersionId: old?.id, ticketGrossCents: gross, ticketFeesCents: fees, taxCents: tax, paidCount: orders.filter((o: any)=>o.status!=='comp').reduce((n: number,o: any)=>n+o.ticketOrderLine_order.reduce((a: number,l: any)=>a+l.quantity,0),0), compCount: orders.filter((o: any)=>o.status==='comp').length, ...totals, computedSnapshot: snapshot, hash };
+  const data = { eventId, status: 'draft', party: 'artist', version: nextVersion, previousVersionId: old?.id, ticketGrossCents: gross, ticketFeesCents: fees, taxCents: tax, paidCount: orders.filter((o: any)=>o.status!=='comp').reduce((n: number,o: any)=>n+o.ticketOrderLine_order.reduce((a: number,l: any)=>a+l.quantity,0),0), compCount: orders.filter((o: any)=>o.status==='comp').length, ...totals, computedSnapshot: snapshot, hash };
   const settlement = await tx.settlement.create({ data });
   if (old && ['draft','reviewed'].includes(old.status)) await transition(tx, 'settlement', old.id, old.status, 'void', actor, 'Superseded by recomputation');
   const lines: [string, number, string][] = [['Ticket gross', gross, 'gross'], ['Pass-through fees', -fees, 'fee'], ['Tax', -tax, 'tax'], ['Counted expenses', -totals.totalExpensesCents, 'expense'], ['Artist guarantee', totals.artistGuaranteeCents, 'guarantee'], ['Artist overage', totals.artistOverageCents, 'overage'], ['Deposits paid', -depositsPaidCents, 'deposit']];
@@ -236,5 +243,16 @@ export async function buildSettlement(tx: any, eventId: string, actor: string) {
   if (event.status === 'completed') await transition(tx, 'event', eventId, 'completed', 'settling', actor, 'Settlement computed');
   await appendAuditEvent(tx,actor,{ action:'settlement.computed',targetList:'Settlement',targetId:settlement.id,after:{hash} });
   return { id:settlement.id,status:'draft',hash,...totals };
+}
+/** A promoter statement at zero: the deal is settled, and so is the event unless an artist settlement is still open. */
+export async function settlePromoterDeal(tx: any, settlement: any, actor: string | null) {
+  const deal = settlement.venueDealId ? await tx.venueDeal.findUnique({ where: { id: settlement.venueDealId } }) : null;
+  if (deal && deal.status === 'accepted') await transition(tx, 'venueDeal', deal.id, 'accepted', 'settled', actor, 'Balance paid in full');
+  const artistOpen = await tx.offer.count({ where: { eventId: settlement.eventId, status: { in: ['accepted', 'contracted'] } } });
+  const event = await tx.event.findUnique({ where: { id: settlement.eventId } });
+  if (!artistOpen && event && event.status === 'settling') await transition(tx, 'event', event.id, 'settling', 'settled', actor, 'Promoter settlement paid in full');
+}
+export async function nextSettlementVersion(tx: any, eventId: string) {
+  return ((await tx.settlement.findFirst({ where: { eventId }, orderBy: { version: 'desc' } }))?.version || 0) + 1;
 }
 export const operatorNames = Object.keys(required);

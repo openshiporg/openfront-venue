@@ -82,6 +82,18 @@ export default withAuth(
         signed: { expiry: 5000 },
         forcePathStyle: true,
       },
+      // Riders, contracts, certificates, POS reports and barcode files: private, read through signed links.
+      my_files: {
+        kind: "s3",
+        type: "file",
+        bucketName,
+        region,
+        accessKeyId,
+        secretAccessKey,
+        endpoint,
+        signed: { expiry: 5000 },
+        forcePathStyle: true,
+      },
     },
     ui: {
       isAccessAllowed: ({ session }) => session?.data.role?.canAccessDashboard ?? false,

@@ -115,7 +115,7 @@ export async function runHoldCommand(operation: string, tx: any, input: any, act
     const showAt = input.showTime ? zonedDateTime(day, input.showTime, zone) : new Date(input.showAt || row.date);
     const doorsAt = input.doorsTime ? zonedDateTime(day, input.doorsTime, zone) : new Date(input.doorsAt || row.date);
     if (Number.isNaN(+showAt) || Number.isNaN(+doorsAt) || doorsAt > showAt) throw new Error('Doors must open before the show');
-    const event = await tx.event.create({ data: { title, roomId: row.roomId, seatingChartId: chart.id, showAt, doorsAt, status: 'hold', promoterId: actor, ageRestriction: input.ageRestriction || 'all_ages' } });
+    const event = await tx.event.create({ data: { title, roomId: row.roomId, seatingChartId: chart.id, showAt, doorsAt, status: 'hold', bookedById: actor, promoterId: row.promoterId || null, ageRestriction: input.ageRestriction || 'all_ages' } });
     await transition(tx, 'dateHold', row.id, fresh.status, 'confirmed', actor, '', { eventId: event.id, challengeDeadline: null });
     if (row.artistId) await tx.eventArtist.create({ data: { eventId: event.id, artistId: row.artistId, billing: 'headliner', position: 1 } });
     await appendAuditEvent(tx, actor, { action: operation, targetList: 'Event', targetId: event.id, after: { status: 'hold' } });

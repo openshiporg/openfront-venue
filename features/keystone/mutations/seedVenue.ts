@@ -97,7 +97,7 @@ async function seedEvent(tx: any, e: any, actor: string) {
   const past = e.showDays < 0;
   const tz = room.timezone || 'America/Los_Angeles';
   const showAt = zoned(e.showDays, 20, tz);
-  const event = await tx.event.create({ data: { title: e.title, roomId: room.id, seatingChartId: chart.id, promoterId: actor, doorsAt: zoned(e.showDays, 19, tz), showAt, curfewAt: zoned(e.showDays, 23, tz), ageRestriction: e.ageRestriction || 'all_ages', status: 'hold', announceAt: at(e.showDays - 60), onSaleAt: e.status === 'presale' ? at(7) : at(e.showDays - 55), presaleAt: e.presaleCode ? at(-3) : null, presaleCode: e.presaleCode || '', allowReentry: false, description: e.origin || '' } });
+  const event = await tx.event.create({ data: { title: e.title, roomId: room.id, seatingChartId: chart.id, bookedById: actor, doorsAt: zoned(e.showDays, 19, tz), showAt, curfewAt: zoned(e.showDays, 23, tz), ageRestriction: e.ageRestriction || 'all_ages', status: 'hold', announceAt: at(e.showDays - 60), onSaleAt: e.status === 'presale' ? at(7) : at(e.showDays - 55), presaleAt: e.presaleCode ? at(-3) : null, presaleCode: e.presaleCode || '', allowReentry: false, description: e.origin || '' } });
   const sectionByName = new Map<string, any>(chart.chartSection_chart.map((s: any) => [s.name, s]));
   const levels: any[] = [];
   for (const l of e.levels) {

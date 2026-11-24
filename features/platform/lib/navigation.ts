@@ -22,6 +22,8 @@ export const platformNavItems: PlatformNavItem[] = [
   { title: 'Events', href: '/platform/events', color: 'blue', description: 'Shows by status with pricing, seating and settlement.', icon: Ticket, group: 'standalone' },
   { title: 'Calendar', href: '/platform/calendar', color: 'purple', description: 'Ranked date holds per room.', icon: CalendarDays, group: 'standalone' },
   { title: 'Inquiries', href: '/platform/inquiries', color: 'amber', description: 'Requests from promoters and clients.', icon: Inbox, group: 'standalone', requires: ['canManageInquiries'] },
+  { title: 'Venue deals', href: '/platform/venue-deals', color: 'violet', description: 'Rent, co-pro and bar terms with each promoter, and the promoter statement.', icon: Building2, group: 'standalone', requires: ['canManageVenueDeals', 'canManageSettlements'] },
+  { title: 'Bar', href: '/platform/bar', color: 'orange', description: 'Bar totals at close from the POS report.', icon: ReceiptText, group: 'standalone', requires: ['canManageSettlements'] },
   { title: 'Deals', href: '/platform/deals', color: 'indigo', description: 'Artist offers and the deal calculator.', icon: Handshake, group: 'standalone', requires: ['canManageDeals', 'canManageSettlements'] },
   { title: 'Box office', href: '/platform/box-office', color: 'teal', description: 'Find orders, refund and transfer.', icon: Store, group: 'standalone', requires: ['canManageOrders', 'canIssueRefunds'] },
   { title: 'Door scan', href: '/platform/door', color: 'orange', description: 'Gate scanning and live admitted count.', icon: ScanLine, group: 'standalone', requires: ['canScanTickets'] },

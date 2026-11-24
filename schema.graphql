@@ -11,10 +11,16 @@ type User {
   emailVerifiedAt: DateTime
   emailConfirmationSentAt: DateTime
   onboardingStatus: String
-  event_promoter(where: EventWhereInput! = {}, orderBy: [EventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: EventWhereUniqueInput): [Event!]
-  event_promoterCount(where: EventWhereInput! = {}): Int
+  event_bookedBy(where: EventWhereInput! = {}, orderBy: [EventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: EventWhereUniqueInput): [Event!]
+  event_bookedByCount(where: EventWhereInput! = {}): Int
   inquiry_handledBy(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
   inquiry_handledByCount(where: InquiryWhereInput! = {}): Int
+  promoterPayment_recordedBy(where: PromoterPaymentWhereInput! = {}, orderBy: [PromoterPaymentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: PromoterPaymentWhereUniqueInput): [PromoterPayment!]
+  promoterPayment_recordedByCount(where: PromoterPaymentWhereInput! = {}): Int
+  barSales_recordedBy(where: BarSalesWhereInput! = {}, orderBy: [BarSalesOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: BarSalesWhereUniqueInput): [BarSales!]
+  barSales_recordedByCount(where: BarSalesWhereInput! = {}): Int
+  document_uploadedBy(where: DocumentWhereInput! = {}, orderBy: [DocumentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DocumentWhereUniqueInput): [Document!]
+  document_uploadedByCount(where: DocumentWhereInput! = {}): Int
   inventoryHold_customer(where: InventoryHoldWhereInput! = {}, orderBy: [InventoryHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InventoryHoldWhereUniqueInput): [InventoryHold!]
   inventoryHold_customerCount(where: InventoryHoldWhereInput! = {}): Int
   ticketOrder_customer(where: TicketOrderWhereInput! = {}, orderBy: [TicketOrderOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: TicketOrderWhereUniqueInput): [TicketOrder!]
@@ -55,8 +61,11 @@ input UserWhereInput {
   emailVerifiedAt: DateTimeNullableFilter
   emailConfirmationSentAt: DateTimeNullableFilter
   onboardingStatus: StringNullableFilter
-  event_promoter: EventManyRelationFilter
+  event_bookedBy: EventManyRelationFilter
   inquiry_handledBy: InquiryManyRelationFilter
+  promoterPayment_recordedBy: PromoterPaymentManyRelationFilter
+  barSales_recordedBy: BarSalesManyRelationFilter
+  document_uploadedBy: DocumentManyRelationFilter
   inventoryHold_customer: InventoryHoldManyRelationFilter
   ticketOrder_customer: TicketOrderManyRelationFilter
   scanEvent_scannedBy: ScanEventManyRelationFilter
@@ -153,6 +162,24 @@ input InquiryManyRelationFilter {
   none: InquiryWhereInput
 }
 
+input PromoterPaymentManyRelationFilter {
+  every: PromoterPaymentWhereInput
+  some: PromoterPaymentWhereInput
+  none: PromoterPaymentWhereInput
+}
+
+input BarSalesManyRelationFilter {
+  every: BarSalesWhereInput
+  some: BarSalesWhereInput
+  none: BarSalesWhereInput
+}
+
+input DocumentManyRelationFilter {
+  every: DocumentWhereInput
+  some: DocumentWhereInput
+  none: DocumentWhereInput
+}
+
 input InventoryHoldManyRelationFilter {
   every: InventoryHoldWhereInput
   some: InventoryHoldWhereInput
@@ -231,8 +258,11 @@ input UserUpdateInput {
   emailVerifiedAt: DateTime
   emailConfirmationSentAt: DateTime
   onboardingStatus: String
-  event_promoter: EventRelateToManyForUpdateInput
+  event_bookedBy: EventRelateToManyForUpdateInput
   inquiry_handledBy: InquiryRelateToManyForUpdateInput
+  promoterPayment_recordedBy: PromoterPaymentRelateToManyForUpdateInput
+  barSales_recordedBy: BarSalesRelateToManyForUpdateInput
+  document_uploadedBy: DocumentRelateToManyForUpdateInput
   inventoryHold_customer: InventoryHoldRelateToManyForUpdateInput
   ticketOrder_customer: TicketOrderRelateToManyForUpdateInput
   scanEvent_scannedBy: ScanEventRelateToManyForUpdateInput
@@ -264,6 +294,27 @@ input InquiryRelateToManyForUpdateInput {
   set: [InquiryWhereUniqueInput!]
   create: [InquiryCreateInput!]
   connect: [InquiryWhereUniqueInput!]
+}
+
+input PromoterPaymentRelateToManyForUpdateInput {
+  disconnect: [PromoterPaymentWhereUniqueInput!]
+  set: [PromoterPaymentWhereUniqueInput!]
+  create: [PromoterPaymentCreateInput!]
+  connect: [PromoterPaymentWhereUniqueInput!]
+}
+
+input BarSalesRelateToManyForUpdateInput {
+  disconnect: [BarSalesWhereUniqueInput!]
+  set: [BarSalesWhereUniqueInput!]
+  create: [BarSalesCreateInput!]
+  connect: [BarSalesWhereUniqueInput!]
+}
+
+input DocumentRelateToManyForUpdateInput {
+  disconnect: [DocumentWhereUniqueInput!]
+  set: [DocumentWhereUniqueInput!]
+  create: [DocumentCreateInput!]
+  connect: [DocumentWhereUniqueInput!]
 }
 
 input InventoryHoldRelateToManyForUpdateInput {
@@ -322,8 +373,11 @@ input UserCreateInput {
   emailVerifiedAt: DateTime
   emailConfirmationSentAt: DateTime
   onboardingStatus: String
-  event_promoter: EventRelateToManyForCreateInput
+  event_bookedBy: EventRelateToManyForCreateInput
   inquiry_handledBy: InquiryRelateToManyForCreateInput
+  promoterPayment_recordedBy: PromoterPaymentRelateToManyForCreateInput
+  barSales_recordedBy: BarSalesRelateToManyForCreateInput
+  document_uploadedBy: DocumentRelateToManyForCreateInput
   inventoryHold_customer: InventoryHoldRelateToManyForCreateInput
   ticketOrder_customer: TicketOrderRelateToManyForCreateInput
   scanEvent_scannedBy: ScanEventRelateToManyForCreateInput
@@ -350,6 +404,21 @@ input EventRelateToManyForCreateInput {
 input InquiryRelateToManyForCreateInput {
   create: [InquiryCreateInput!]
   connect: [InquiryWhereUniqueInput!]
+}
+
+input PromoterPaymentRelateToManyForCreateInput {
+  create: [PromoterPaymentCreateInput!]
+  connect: [PromoterPaymentWhereUniqueInput!]
+}
+
+input BarSalesRelateToManyForCreateInput {
+  create: [BarSalesCreateInput!]
+  connect: [BarSalesWhereUniqueInput!]
+}
+
+input DocumentRelateToManyForCreateInput {
+  create: [DocumentCreateInput!]
+  connect: [DocumentWhereUniqueInput!]
 }
 
 input InventoryHoldRelateToManyForCreateInput {
@@ -1599,7 +1668,8 @@ type Event {
   ageRestriction: String
   room: Room
   seatingChart: SeatingChart
-  promoter: User
+  bookedBy: User
+  promoter: Promoter
   eventArtist_event(where: EventArtistWhereInput! = {}, orderBy: [EventArtistOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: EventArtistWhereUniqueInput): [EventArtist!]
   eventArtist_eventCount(where: EventArtistWhereInput! = {}): Int
   dateHold_event(where: DateHoldWhereInput! = {}, orderBy: [DateHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DateHoldWhereUniqueInput): [DateHold!]
@@ -1630,6 +1700,10 @@ type Event {
   barSales_eventCount(where: BarSalesWhereInput! = {}): Int
   settlement_event(where: SettlementWhereInput! = {}, orderBy: [SettlementOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: SettlementWhereUniqueInput): [Settlement!]
   settlement_eventCount(where: SettlementWhereInput! = {}): Int
+  venueDeal_event(where: VenueDealWhereInput! = {}, orderBy: [VenueDealOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: VenueDealWhereUniqueInput): [VenueDeal!]
+  venueDeal_eventCount(where: VenueDealWhereInput! = {}): Int
+  document_event(where: DocumentWhereInput! = {}, orderBy: [DocumentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DocumentWhereUniqueInput): [Document!]
+  document_eventCount(where: DocumentWhereInput! = {}): Int
   sold: Int
   held: Int
   kills: Int
@@ -1665,7 +1739,8 @@ input EventWhereInput {
   ageRestriction: StringNullableFilter
   room: RoomWhereInput
   seatingChart: SeatingChartWhereInput
-  promoter: UserWhereInput
+  bookedBy: UserWhereInput
+  promoter: PromoterWhereInput
   eventArtist_event: EventArtistManyRelationFilter
   dateHold_event: DateHoldManyRelationFilter
   offer_event: OfferManyRelationFilter
@@ -1681,6 +1756,8 @@ input EventWhereInput {
   merchSales_event: MerchSalesManyRelationFilter
   barSales_event: BarSalesManyRelationFilter
   settlement_event: SettlementManyRelationFilter
+  venueDeal_event: VenueDealManyRelationFilter
+  document_event: DocumentManyRelationFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 }
@@ -1715,16 +1792,16 @@ input MerchSalesManyRelationFilter {
   none: MerchSalesWhereInput
 }
 
-input BarSalesManyRelationFilter {
-  every: BarSalesWhereInput
-  some: BarSalesWhereInput
-  none: BarSalesWhereInput
-}
-
 input SettlementManyRelationFilter {
   every: SettlementWhereInput
   some: SettlementWhereInput
   none: SettlementWhereInput
+}
+
+input VenueDealManyRelationFilter {
+  every: VenueDealWhereInput
+  some: VenueDealWhereInput
+  none: VenueDealWhereInput
 }
 
 input EventOrderByInput {
@@ -1767,7 +1844,8 @@ input EventUpdateInput {
   ageRestriction: String
   room: RoomRelateToOneForUpdateInput
   seatingChart: SeatingChartRelateToOneForUpdateInput
-  promoter: UserRelateToOneForUpdateInput
+  bookedBy: UserRelateToOneForUpdateInput
+  promoter: PromoterRelateToOneForUpdateInput
   eventArtist_event: EventArtistRelateToManyForUpdateInput
   dateHold_event: DateHoldRelateToManyForUpdateInput
   offer_event: OfferRelateToManyForUpdateInput
@@ -1783,8 +1861,16 @@ input EventUpdateInput {
   merchSales_event: MerchSalesRelateToManyForUpdateInput
   barSales_event: BarSalesRelateToManyForUpdateInput
   settlement_event: SettlementRelateToManyForUpdateInput
+  venueDeal_event: VenueDealRelateToManyForUpdateInput
+  document_event: DocumentRelateToManyForUpdateInput
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+input PromoterRelateToOneForUpdateInput {
+  create: PromoterCreateInput
+  connect: PromoterWhereUniqueInput
+  disconnect: Boolean
 }
 
 input EventExpenseRelateToManyForUpdateInput {
@@ -1822,18 +1908,18 @@ input MerchSalesRelateToManyForUpdateInput {
   connect: [MerchSalesWhereUniqueInput!]
 }
 
-input BarSalesRelateToManyForUpdateInput {
-  disconnect: [BarSalesWhereUniqueInput!]
-  set: [BarSalesWhereUniqueInput!]
-  create: [BarSalesCreateInput!]
-  connect: [BarSalesWhereUniqueInput!]
-}
-
 input SettlementRelateToManyForUpdateInput {
   disconnect: [SettlementWhereUniqueInput!]
   set: [SettlementWhereUniqueInput!]
   create: [SettlementCreateInput!]
   connect: [SettlementWhereUniqueInput!]
+}
+
+input VenueDealRelateToManyForUpdateInput {
+  disconnect: [VenueDealWhereUniqueInput!]
+  set: [VenueDealWhereUniqueInput!]
+  create: [VenueDealCreateInput!]
+  connect: [VenueDealWhereUniqueInput!]
 }
 
 input EventUpdateArgs {
@@ -1860,7 +1946,8 @@ input EventCreateInput {
   ageRestriction: String
   room: RoomRelateToOneForCreateInput
   seatingChart: SeatingChartRelateToOneForCreateInput
-  promoter: UserRelateToOneForCreateInput
+  bookedBy: UserRelateToOneForCreateInput
+  promoter: PromoterRelateToOneForCreateInput
   eventArtist_event: EventArtistRelateToManyForCreateInput
   dateHold_event: DateHoldRelateToManyForCreateInput
   offer_event: OfferRelateToManyForCreateInput
@@ -1876,8 +1963,15 @@ input EventCreateInput {
   merchSales_event: MerchSalesRelateToManyForCreateInput
   barSales_event: BarSalesRelateToManyForCreateInput
   settlement_event: SettlementRelateToManyForCreateInput
+  venueDeal_event: VenueDealRelateToManyForCreateInput
+  document_event: DocumentRelateToManyForCreateInput
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+input PromoterRelateToOneForCreateInput {
+  create: PromoterCreateInput
+  connect: PromoterWhereUniqueInput
 }
 
 input EventExpenseRelateToManyForCreateInput {
@@ -1905,14 +1999,14 @@ input MerchSalesRelateToManyForCreateInput {
   connect: [MerchSalesWhereUniqueInput!]
 }
 
-input BarSalesRelateToManyForCreateInput {
-  create: [BarSalesCreateInput!]
-  connect: [BarSalesWhereUniqueInput!]
-}
-
 input SettlementRelateToManyForCreateInput {
   create: [SettlementCreateInput!]
   connect: [SettlementWhereUniqueInput!]
+}
+
+input VenueDealRelateToManyForCreateInput {
+  create: [VenueDealCreateInput!]
+  connect: [VenueDealWhereUniqueInput!]
 }
 
 type EventArtist {
@@ -2025,6 +2119,8 @@ type DateHold {
   notes: String
   releasedReason: String
   promoter: Promoter
+  venueDeal_hold(where: VenueDealWhereInput! = {}, orderBy: [VenueDealOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: VenueDealWhereUniqueInput): [VenueDeal!]
+  venueDeal_holdCount(where: VenueDealWhereInput! = {}): Int
   room: Room
   artist: Artist
   agency: Agency
@@ -2055,6 +2151,7 @@ input DateHoldWhereInput {
   notes: StringFilter
   releasedReason: StringFilter
   promoter: PromoterWhereInput
+  venueDeal_hold: VenueDealManyRelationFilter
   room: RoomWhereInput
   artist: ArtistWhereInput
   agency: AgencyWhereInput
@@ -2091,6 +2188,7 @@ input DateHoldUpdateInput {
   notes: String
   releasedReason: String
   promoter: PromoterRelateToOneForUpdateInput
+  venueDeal_hold: VenueDealRelateToManyForUpdateInput
   room: RoomRelateToOneForUpdateInput
   artist: ArtistRelateToOneForUpdateInput
   agency: AgencyRelateToOneForUpdateInput
@@ -2102,12 +2200,6 @@ input DateHoldUpdateInput {
 input DateHoldRelateToOneForUpdateInput {
   create: DateHoldCreateInput
   connect: DateHoldWhereUniqueInput
-  disconnect: Boolean
-}
-
-input PromoterRelateToOneForUpdateInput {
-  create: PromoterCreateInput
-  connect: PromoterWhereUniqueInput
   disconnect: Boolean
 }
 
@@ -2129,6 +2221,7 @@ input DateHoldCreateInput {
   notes: String
   releasedReason: String
   promoter: PromoterRelateToOneForCreateInput
+  venueDeal_hold: VenueDealRelateToManyForCreateInput
   room: RoomRelateToOneForCreateInput
   artist: ArtistRelateToOneForCreateInput
   agency: AgencyRelateToOneForCreateInput
@@ -2140,11 +2233,6 @@ input DateHoldCreateInput {
 input DateHoldRelateToOneForCreateInput {
   create: DateHoldCreateInput
   connect: DateHoldWhereUniqueInput
-}
-
-input PromoterRelateToOneForCreateInput {
-  create: PromoterCreateInput
-  connect: PromoterWhereUniqueInput
 }
 
 type Promoter {
@@ -2159,6 +2247,12 @@ type Promoter {
   dateHold_promoterCount(where: DateHoldWhereInput! = {}): Int
   inquiry_promoter(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
   inquiry_promoterCount(where: InquiryWhereInput! = {}): Int
+  venueDeal_promoter(where: VenueDealWhereInput! = {}, orderBy: [VenueDealOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: VenueDealWhereUniqueInput): [VenueDeal!]
+  venueDeal_promoterCount(where: VenueDealWhereInput! = {}): Int
+  event_promoter(where: EventWhereInput! = {}, orderBy: [EventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: EventWhereUniqueInput): [Event!]
+  event_promoterCount(where: EventWhereInput! = {}): Int
+  document_promoter(where: DocumentWhereInput! = {}, orderBy: [DocumentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DocumentWhereUniqueInput): [Document!]
+  document_promoterCount(where: DocumentWhereInput! = {}): Int
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2180,6 +2274,9 @@ input PromoterWhereInput {
   notes: StringFilter
   dateHold_promoter: DateHoldManyRelationFilter
   inquiry_promoter: InquiryManyRelationFilter
+  venueDeal_promoter: VenueDealManyRelationFilter
+  event_promoter: EventManyRelationFilter
+  document_promoter: DocumentManyRelationFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 }
@@ -2205,6 +2302,9 @@ input PromoterUpdateInput {
   notes: String
   dateHold_promoter: DateHoldRelateToManyForUpdateInput
   inquiry_promoter: InquiryRelateToManyForUpdateInput
+  venueDeal_promoter: VenueDealRelateToManyForUpdateInput
+  event_promoter: EventRelateToManyForUpdateInput
+  document_promoter: DocumentRelateToManyForUpdateInput
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2223,6 +2323,9 @@ input PromoterCreateInput {
   notes: String
   dateHold_promoter: DateHoldRelateToManyForCreateInput
   inquiry_promoter: InquiryRelateToManyForCreateInput
+  venueDeal_promoter: VenueDealRelateToManyForCreateInput
+  event_promoter: EventRelateToManyForCreateInput
+  document_promoter: DocumentRelateToManyForCreateInput
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2347,6 +2450,519 @@ input InquiryCreateInput {
   handledBy: UserRelateToOneForCreateInput
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+type VenueDeal {
+  id: ID!
+  event: Event
+  hold: DateHold
+  promoter: Promoter
+  version: Int
+  status: String
+  dealType: String
+  rentMode: String
+  rentCents: Int
+  rentPercentBps: Int
+  rentBase: String
+  rentBaseKind: String
+  coProMode: String
+  venueShareBps: Int
+  contributedRevenues: JSON
+  barMode: String
+  barGuaranteeCents: Int
+  barTiers: JSON
+  facilityFeeCents: Int
+  ticketFeeShareBps: Int
+  depositCents: Int
+  depositDueAt: DateTime
+  balanceDueAt: DateTime
+  insuranceRequired: Boolean
+  requiredLimitCents: Int
+  issuer: String
+  notes: String
+  terms: JSON
+  termsHash: String
+  acceptedByName: String
+  acceptedAt: DateTime
+  sentAt: DateTime
+  cancelReason: String
+  publicTokenHash: String
+  previousVersion: VenueDeal
+  nextVersions(where: VenueDealWhereInput! = {}, orderBy: [VenueDealOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: VenueDealWhereUniqueInput): [VenueDeal!]
+  nextVersionsCount(where: VenueDealWhereInput! = {}): Int
+  houseExpense_venueDeal(where: HouseExpenseWhereInput! = {}, orderBy: [HouseExpenseOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: HouseExpenseWhereUniqueInput): [HouseExpense!]
+  houseExpense_venueDealCount(where: HouseExpenseWhereInput! = {}): Int
+  promoterPayment_venueDeal(where: PromoterPaymentWhereInput! = {}, orderBy: [PromoterPaymentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: PromoterPaymentWhereUniqueInput): [PromoterPayment!]
+  promoterPayment_venueDealCount(where: PromoterPaymentWhereInput! = {}): Int
+  settlement_venueDeal(where: SettlementWhereInput! = {}, orderBy: [SettlementOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: SettlementWhereUniqueInput): [Settlement!]
+  settlement_venueDealCount(where: SettlementWhereInput! = {}): Int
+  document_venueDeal(where: DocumentWhereInput! = {}, orderBy: [DocumentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DocumentWhereUniqueInput): [Document!]
+  document_venueDealCount(where: DocumentWhereInput! = {}): Int
+  currencyCode: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input VenueDealWhereUniqueInput {
+  id: ID
+  publicTokenHash: String
+}
+
+input VenueDealWhereInput {
+  AND: [VenueDealWhereInput!]
+  OR: [VenueDealWhereInput!]
+  NOT: [VenueDealWhereInput!]
+  id: IDFilter
+  event: EventWhereInput
+  hold: DateHoldWhereInput
+  promoter: PromoterWhereInput
+  version: IntNullableFilter
+  status: StringNullableFilter
+  dealType: StringNullableFilter
+  rentMode: StringNullableFilter
+  rentCents: IntNullableFilter
+  rentPercentBps: IntNullableFilter
+  rentBase: StringFilter
+  rentBaseKind: StringNullableFilter
+  coProMode: StringNullableFilter
+  venueShareBps: IntNullableFilter
+  barMode: StringNullableFilter
+  barGuaranteeCents: IntNullableFilter
+  facilityFeeCents: IntNullableFilter
+  ticketFeeShareBps: IntNullableFilter
+  depositCents: IntNullableFilter
+  depositDueAt: DateTimeNullableFilter
+  balanceDueAt: DateTimeNullableFilter
+  insuranceRequired: BooleanFilter
+  requiredLimitCents: IntNullableFilter
+  issuer: StringNullableFilter
+  notes: StringFilter
+  termsHash: StringFilter
+  acceptedByName: StringFilter
+  acceptedAt: DateTimeNullableFilter
+  sentAt: DateTimeNullableFilter
+  cancelReason: StringFilter
+  publicTokenHash: StringNullableFilter
+  previousVersion: VenueDealWhereInput
+  nextVersions: VenueDealManyRelationFilter
+  houseExpense_venueDeal: HouseExpenseManyRelationFilter
+  promoterPayment_venueDeal: PromoterPaymentManyRelationFilter
+  settlement_venueDeal: SettlementManyRelationFilter
+  document_venueDeal: DocumentManyRelationFilter
+  currencyCode: StringFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input HouseExpenseManyRelationFilter {
+  every: HouseExpenseWhereInput
+  some: HouseExpenseWhereInput
+  none: HouseExpenseWhereInput
+}
+
+input VenueDealOrderByInput {
+  id: OrderDirection
+  version: OrderDirection
+  status: OrderDirection
+  dealType: OrderDirection
+  rentMode: OrderDirection
+  rentCents: OrderDirection
+  rentPercentBps: OrderDirection
+  rentBase: OrderDirection
+  rentBaseKind: OrderDirection
+  coProMode: OrderDirection
+  venueShareBps: OrderDirection
+  barMode: OrderDirection
+  barGuaranteeCents: OrderDirection
+  facilityFeeCents: OrderDirection
+  ticketFeeShareBps: OrderDirection
+  depositCents: OrderDirection
+  depositDueAt: OrderDirection
+  balanceDueAt: OrderDirection
+  insuranceRequired: OrderDirection
+  requiredLimitCents: OrderDirection
+  issuer: OrderDirection
+  notes: OrderDirection
+  termsHash: OrderDirection
+  acceptedByName: OrderDirection
+  acceptedAt: OrderDirection
+  sentAt: OrderDirection
+  cancelReason: OrderDirection
+  publicTokenHash: OrderDirection
+  currencyCode: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input VenueDealUpdateInput {
+  event: EventRelateToOneForUpdateInput
+  hold: DateHoldRelateToOneForUpdateInput
+  promoter: PromoterRelateToOneForUpdateInput
+  version: Int
+  status: String
+  dealType: String
+  rentMode: String
+  rentCents: Int
+  rentPercentBps: Int
+  rentBase: String
+  rentBaseKind: String
+  coProMode: String
+  venueShareBps: Int
+  contributedRevenues: JSON
+  barMode: String
+  barGuaranteeCents: Int
+  barTiers: JSON
+  facilityFeeCents: Int
+  ticketFeeShareBps: Int
+  depositCents: Int
+  depositDueAt: DateTime
+  balanceDueAt: DateTime
+  insuranceRequired: Boolean
+  requiredLimitCents: Int
+  issuer: String
+  notes: String
+  terms: JSON
+  termsHash: String
+  acceptedByName: String
+  acceptedAt: DateTime
+  sentAt: DateTime
+  cancelReason: String
+  publicTokenHash: String
+  previousVersion: VenueDealRelateToOneForUpdateInput
+  nextVersions: VenueDealRelateToManyForUpdateInput
+  houseExpense_venueDeal: HouseExpenseRelateToManyForUpdateInput
+  promoterPayment_venueDeal: PromoterPaymentRelateToManyForUpdateInput
+  settlement_venueDeal: SettlementRelateToManyForUpdateInput
+  document_venueDeal: DocumentRelateToManyForUpdateInput
+  currencyCode: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input VenueDealRelateToOneForUpdateInput {
+  create: VenueDealCreateInput
+  connect: VenueDealWhereUniqueInput
+  disconnect: Boolean
+}
+
+input HouseExpenseRelateToManyForUpdateInput {
+  disconnect: [HouseExpenseWhereUniqueInput!]
+  set: [HouseExpenseWhereUniqueInput!]
+  create: [HouseExpenseCreateInput!]
+  connect: [HouseExpenseWhereUniqueInput!]
+}
+
+input VenueDealUpdateArgs {
+  where: VenueDealWhereUniqueInput!
+  data: VenueDealUpdateInput!
+}
+
+input VenueDealCreateInput {
+  event: EventRelateToOneForCreateInput
+  hold: DateHoldRelateToOneForCreateInput
+  promoter: PromoterRelateToOneForCreateInput
+  version: Int
+  status: String
+  dealType: String
+  rentMode: String
+  rentCents: Int
+  rentPercentBps: Int
+  rentBase: String
+  rentBaseKind: String
+  coProMode: String
+  venueShareBps: Int
+  contributedRevenues: JSON
+  barMode: String
+  barGuaranteeCents: Int
+  barTiers: JSON
+  facilityFeeCents: Int
+  ticketFeeShareBps: Int
+  depositCents: Int
+  depositDueAt: DateTime
+  balanceDueAt: DateTime
+  insuranceRequired: Boolean
+  requiredLimitCents: Int
+  issuer: String
+  notes: String
+  terms: JSON
+  termsHash: String
+  acceptedByName: String
+  acceptedAt: DateTime
+  sentAt: DateTime
+  cancelReason: String
+  publicTokenHash: String
+  previousVersion: VenueDealRelateToOneForCreateInput
+  nextVersions: VenueDealRelateToManyForCreateInput
+  houseExpense_venueDeal: HouseExpenseRelateToManyForCreateInput
+  promoterPayment_venueDeal: PromoterPaymentRelateToManyForCreateInput
+  settlement_venueDeal: SettlementRelateToManyForCreateInput
+  document_venueDeal: DocumentRelateToManyForCreateInput
+  currencyCode: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input VenueDealRelateToOneForCreateInput {
+  create: VenueDealCreateInput
+  connect: VenueDealWhereUniqueInput
+}
+
+input HouseExpenseRelateToManyForCreateInput {
+  create: [HouseExpenseCreateInput!]
+  connect: [HouseExpenseWhereUniqueInput!]
+}
+
+type HouseExpense {
+  id: ID!
+  venueDeal: VenueDeal
+  label: String
+  category: String
+  basis: String
+  role: String
+  amountCents: Int
+  rateCents: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input HouseExpenseWhereUniqueInput {
+  id: ID
+}
+
+input HouseExpenseWhereInput {
+  AND: [HouseExpenseWhereInput!]
+  OR: [HouseExpenseWhereInput!]
+  NOT: [HouseExpenseWhereInput!]
+  id: IDFilter
+  venueDeal: VenueDealWhereInput
+  label: StringFilter
+  category: StringNullableFilter
+  basis: StringNullableFilter
+  role: StringFilter
+  amountCents: IntNullableFilter
+  rateCents: IntNullableFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input HouseExpenseOrderByInput {
+  id: OrderDirection
+  label: OrderDirection
+  category: OrderDirection
+  basis: OrderDirection
+  role: OrderDirection
+  amountCents: OrderDirection
+  rateCents: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input HouseExpenseUpdateInput {
+  venueDeal: VenueDealRelateToOneForUpdateInput
+  label: String
+  category: String
+  basis: String
+  role: String
+  amountCents: Int
+  rateCents: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input HouseExpenseUpdateArgs {
+  where: HouseExpenseWhereUniqueInput!
+  data: HouseExpenseUpdateInput!
+}
+
+input HouseExpenseCreateInput {
+  venueDeal: VenueDealRelateToOneForCreateInput
+  label: String
+  category: String
+  basis: String
+  role: String
+  amountCents: Int
+  rateCents: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type PromoterPayment {
+  id: ID!
+  venueDeal: VenueDeal
+  direction: String
+  kind: String
+  amountCents: Int
+  method: String
+  reference: String
+  recordedBy: User
+  idempotencyKey: String
+  currencyCode: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PromoterPaymentWhereUniqueInput {
+  id: ID
+  idempotencyKey: String
+}
+
+input PromoterPaymentWhereInput {
+  AND: [PromoterPaymentWhereInput!]
+  OR: [PromoterPaymentWhereInput!]
+  NOT: [PromoterPaymentWhereInput!]
+  id: IDFilter
+  venueDeal: VenueDealWhereInput
+  direction: StringNullableFilter
+  kind: StringNullableFilter
+  amountCents: IntNullableFilter
+  method: StringNullableFilter
+  reference: StringFilter
+  recordedBy: UserWhereInput
+  idempotencyKey: StringNullableFilter
+  currencyCode: StringFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input PromoterPaymentOrderByInput {
+  id: OrderDirection
+  direction: OrderDirection
+  kind: OrderDirection
+  amountCents: OrderDirection
+  method: OrderDirection
+  reference: OrderDirection
+  idempotencyKey: OrderDirection
+  currencyCode: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input PromoterPaymentUpdateInput {
+  venueDeal: VenueDealRelateToOneForUpdateInput
+  direction: String
+  kind: String
+  amountCents: Int
+  method: String
+  reference: String
+  recordedBy: UserRelateToOneForUpdateInput
+  idempotencyKey: String
+  currencyCode: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PromoterPaymentUpdateArgs {
+  where: PromoterPaymentWhereUniqueInput!
+  data: PromoterPaymentUpdateInput!
+}
+
+input PromoterPaymentCreateInput {
+  venueDeal: VenueDealRelateToOneForCreateInput
+  direction: String
+  kind: String
+  amountCents: Int
+  method: String
+  reference: String
+  recordedBy: UserRelateToOneForCreateInput
+  idempotencyKey: String
+  currencyCode: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type Document {
+  id: ID!
+  title: String
+  kind: String
+  file: FileFieldOutput
+  event: Event
+  venueDeal: VenueDeal
+  promoter: Promoter
+  barSales: BarSales
+  uploadedBy: User
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type FileFieldOutput {
+  filename: String!
+  filesize: Int!
+  url: String!
+}
+
+input DocumentWhereUniqueInput {
+  id: ID
+  barSales: BarSalesWhereUniqueInput
+}
+
+input DocumentWhereInput {
+  AND: [DocumentWhereInput!]
+  OR: [DocumentWhereInput!]
+  NOT: [DocumentWhereInput!]
+  id: IDFilter
+  title: StringFilter
+  kind: StringNullableFilter
+  event: EventWhereInput
+  venueDeal: VenueDealWhereInput
+  promoter: PromoterWhereInput
+  barSales: BarSalesWhereInput
+  uploadedBy: UserWhereInput
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input DocumentOrderByInput {
+  id: OrderDirection
+  title: OrderDirection
+  kind: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input DocumentUpdateInput {
+  title: String
+  kind: String
+  file: FileFieldInput
+  event: EventRelateToOneForUpdateInput
+  venueDeal: VenueDealRelateToOneForUpdateInput
+  promoter: PromoterRelateToOneForUpdateInput
+  barSales: BarSalesRelateToOneForUpdateInput
+  uploadedBy: UserRelateToOneForUpdateInput
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input FileFieldInput {
+  upload: Upload!
+}
+
+input BarSalesRelateToOneForUpdateInput {
+  create: BarSalesCreateInput
+  connect: BarSalesWhereUniqueInput
+  disconnect: Boolean
+}
+
+input DocumentUpdateArgs {
+  where: DocumentWhereUniqueInput!
+  data: DocumentUpdateInput!
+}
+
+input DocumentCreateInput {
+  title: String
+  kind: String
+  file: FileFieldInput
+  event: EventRelateToOneForCreateInput
+  venueDeal: VenueDealRelateToOneForCreateInput
+  promoter: PromoterRelateToOneForCreateInput
+  barSales: BarSalesRelateToOneForCreateInput
+  uploadedBy: UserRelateToOneForCreateInput
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input BarSalesRelateToOneForCreateInput {
+  create: BarSalesCreateInput
+  connect: BarSalesWhereUniqueInput
 }
 
 type Offer {
@@ -3975,7 +4591,13 @@ input MerchSalesCreateInput {
 type BarSales {
   id: ID!
   grossCents: Int
+  compsCents: Int
+  voidsCents: Int
+  taxCents: Int
+  netCents: Int
   promoterShareBps: Int
+  report: Document
+  recordedBy: User
   event: Event
   currencyCode: String
   createdAt: DateTime
@@ -3984,6 +4606,7 @@ type BarSales {
 
 input BarSalesWhereUniqueInput {
   id: ID
+  report: DocumentWhereUniqueInput
 }
 
 input BarSalesWhereInput {
@@ -3992,7 +4615,13 @@ input BarSalesWhereInput {
   NOT: [BarSalesWhereInput!]
   id: IDFilter
   grossCents: IntNullableFilter
+  compsCents: IntNullableFilter
+  voidsCents: IntNullableFilter
+  taxCents: IntNullableFilter
+  netCents: IntNullableFilter
   promoterShareBps: IntNullableFilter
+  report: DocumentWhereInput
+  recordedBy: UserWhereInput
   event: EventWhereInput
   currencyCode: StringFilter
   createdAt: DateTimeFilter
@@ -4002,6 +4631,10 @@ input BarSalesWhereInput {
 input BarSalesOrderByInput {
   id: OrderDirection
   grossCents: OrderDirection
+  compsCents: OrderDirection
+  voidsCents: OrderDirection
+  taxCents: OrderDirection
+  netCents: OrderDirection
   promoterShareBps: OrderDirection
   currencyCode: OrderDirection
   createdAt: OrderDirection
@@ -4010,11 +4643,23 @@ input BarSalesOrderByInput {
 
 input BarSalesUpdateInput {
   grossCents: Int
+  compsCents: Int
+  voidsCents: Int
+  taxCents: Int
+  netCents: Int
   promoterShareBps: Int
+  report: DocumentRelateToOneForUpdateInput
+  recordedBy: UserRelateToOneForUpdateInput
   event: EventRelateToOneForUpdateInput
   currencyCode: String
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+input DocumentRelateToOneForUpdateInput {
+  create: DocumentCreateInput
+  connect: DocumentWhereUniqueInput
+  disconnect: Boolean
 }
 
 input BarSalesUpdateArgs {
@@ -4024,11 +4669,22 @@ input BarSalesUpdateArgs {
 
 input BarSalesCreateInput {
   grossCents: Int
+  compsCents: Int
+  voidsCents: Int
+  taxCents: Int
+  netCents: Int
   promoterShareBps: Int
+  report: DocumentRelateToOneForCreateInput
+  recordedBy: UserRelateToOneForCreateInput
   event: EventRelateToOneForCreateInput
   currencyCode: String
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+input DocumentRelateToOneForCreateInput {
+  create: DocumentCreateInput
+  connect: DocumentWhereUniqueInput
 }
 
 type Settlement {
@@ -4054,6 +4710,9 @@ type Settlement {
   promoterNetCents: Int
   computedSnapshot: JSON
   approvals: JSON
+  party: String
+  venueDeal: VenueDeal
+  balanceDuePromoterCents: Int
   status: String
   event: Event
   previousVersion: Settlement
@@ -4096,6 +4755,9 @@ input SettlementWhereInput {
   depositsPaidCents: IntNullableFilter
   balanceDueArtistCents: IntNullableFilter
   promoterNetCents: IntNullableFilter
+  party: StringNullableFilter
+  venueDeal: VenueDealWhereInput
+  balanceDuePromoterCents: IntNullableFilter
   status: StringNullableFilter
   event: EventWhereInput
   previousVersion: SettlementWhereInput
@@ -4134,6 +4796,8 @@ input SettlementOrderByInput {
   depositsPaidCents: OrderDirection
   balanceDueArtistCents: OrderDirection
   promoterNetCents: OrderDirection
+  party: OrderDirection
+  balanceDuePromoterCents: OrderDirection
   status: OrderDirection
   currencyCode: OrderDirection
   createdAt: OrderDirection
@@ -4162,6 +4826,9 @@ input SettlementUpdateInput {
   promoterNetCents: Int
   computedSnapshot: JSON
   approvals: JSON
+  party: String
+  venueDeal: VenueDealRelateToOneForUpdateInput
+  balanceDuePromoterCents: Int
   status: String
   event: EventRelateToOneForUpdateInput
   previousVersion: SettlementRelateToOneForUpdateInput
@@ -4213,6 +4880,9 @@ input SettlementCreateInput {
   promoterNetCents: Int
   computedSnapshot: JSON
   approvals: JSON
+  party: String
+  venueDeal: VenueDealRelateToOneForCreateInput
+  balanceDuePromoterCents: Int
   status: String
   event: EventRelateToOneForCreateInput
   previousVersion: SettlementRelateToOneForCreateInput
@@ -4239,6 +4909,7 @@ type SettlementLine {
   label: String
   sourceRef: String
   reason: String
+  rule: String
   amountCents: Int
   roundingRemainder: Int
   kind: String
@@ -4261,6 +4932,7 @@ input SettlementLineWhereInput {
   label: StringFilter
   sourceRef: StringFilter
   reason: StringFilter
+  rule: StringFilter
   amountCents: IntNullableFilter
   roundingRemainder: IntNullableFilter
   kind: StringNullableFilter
@@ -4276,6 +4948,7 @@ input SettlementLineOrderByInput {
   label: OrderDirection
   sourceRef: OrderDirection
   reason: OrderDirection
+  rule: OrderDirection
   amountCents: OrderDirection
   roundingRemainder: OrderDirection
   kind: OrderDirection
@@ -4288,6 +4961,7 @@ input SettlementLineUpdateInput {
   label: String
   sourceRef: String
   reason: String
+  rule: String
   amountCents: Int
   roundingRemainder: Int
   kind: String
@@ -4307,6 +4981,7 @@ input SettlementLineCreateInput {
   label: String
   sourceRef: String
   reason: String
+  rule: String
   amountCents: Int
   roundingRemainder: Int
   kind: String
@@ -5614,6 +6289,30 @@ type Mutation {
   updateInquiries(data: [InquiryUpdateArgs!]!): [Inquiry]
   deleteInquiry(where: InquiryWhereUniqueInput!): Inquiry
   deleteInquiries(where: [InquiryWhereUniqueInput!]!): [Inquiry]
+  createVenueDeal(data: VenueDealCreateInput!): VenueDeal
+  createVenueDeals(data: [VenueDealCreateInput!]!): [VenueDeal]
+  updateVenueDeal(where: VenueDealWhereUniqueInput!, data: VenueDealUpdateInput!): VenueDeal
+  updateVenueDeals(data: [VenueDealUpdateArgs!]!): [VenueDeal]
+  deleteVenueDeal(where: VenueDealWhereUniqueInput!): VenueDeal
+  deleteVenueDeals(where: [VenueDealWhereUniqueInput!]!): [VenueDeal]
+  createHouseExpense(data: HouseExpenseCreateInput!): HouseExpense
+  createHouseExpenses(data: [HouseExpenseCreateInput!]!): [HouseExpense]
+  updateHouseExpense(where: HouseExpenseWhereUniqueInput!, data: HouseExpenseUpdateInput!): HouseExpense
+  updateHouseExpenses(data: [HouseExpenseUpdateArgs!]!): [HouseExpense]
+  deleteHouseExpense(where: HouseExpenseWhereUniqueInput!): HouseExpense
+  deleteHouseExpenses(where: [HouseExpenseWhereUniqueInput!]!): [HouseExpense]
+  createPromoterPayment(data: PromoterPaymentCreateInput!): PromoterPayment
+  createPromoterPayments(data: [PromoterPaymentCreateInput!]!): [PromoterPayment]
+  updatePromoterPayment(where: PromoterPaymentWhereUniqueInput!, data: PromoterPaymentUpdateInput!): PromoterPayment
+  updatePromoterPayments(data: [PromoterPaymentUpdateArgs!]!): [PromoterPayment]
+  deletePromoterPayment(where: PromoterPaymentWhereUniqueInput!): PromoterPayment
+  deletePromoterPayments(where: [PromoterPaymentWhereUniqueInput!]!): [PromoterPayment]
+  createDocument(data: DocumentCreateInput!): Document
+  createDocuments(data: [DocumentCreateInput!]!): [Document]
+  updateDocument(where: DocumentWhereUniqueInput!, data: DocumentUpdateInput!): Document
+  updateDocuments(data: [DocumentUpdateArgs!]!): [Document]
+  deleteDocument(where: DocumentWhereUniqueInput!): Document
+  deleteDocuments(where: [DocumentWhereUniqueInput!]!): [Document]
   createOffer(data: OfferCreateInput!): Offer
   createOffers(data: [OfferCreateInput!]!): [Offer]
   updateOffer(where: OfferWhereUniqueInput!, data: OfferUpdateInput!): Offer
@@ -5803,6 +6502,13 @@ type Mutation {
   resendOrderConfirmation(orderId: ID!): JSON
   setRecordHidden(list: String!, id: ID!, hidden: Boolean!, reason: String): JSON
   submitInquiry(input: JSON!): JSON
+  acceptVenueDeal(token: String!, name: String!, termsHash: String, idempotencyKey: String!): JSON
+  saveVenueDeal(input: OperatorCommandInput!): JSON
+  sendVenueDeal(input: OperatorCommandInput!): JSON
+  cancelVenueDeal(input: OperatorCommandInput!): JSON
+  recordBarSales(input: OperatorCommandInput!): JSON
+  recordPromoterPayment(input: OperatorCommandInput!): JSON
+  buildPromoterSettlement(input: OperatorCommandInput!): JSON
   workInquiry(input: JSON!): JSON
   sendEmailConfirmation: JSON
   confirmCustomerEmail(userId: ID!, proof: String!): JSON
@@ -5922,6 +6628,18 @@ type Query {
   inquiry(where: InquiryWhereUniqueInput!): Inquiry
   inquiries(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
   inquiriesCount(where: InquiryWhereInput! = {}): Int
+  venueDeal(where: VenueDealWhereUniqueInput!): VenueDeal
+  venueDeals(where: VenueDealWhereInput! = {}, orderBy: [VenueDealOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: VenueDealWhereUniqueInput): [VenueDeal!]
+  venueDealsCount(where: VenueDealWhereInput! = {}): Int
+  houseExpense(where: HouseExpenseWhereUniqueInput!): HouseExpense
+  houseExpenses(where: HouseExpenseWhereInput! = {}, orderBy: [HouseExpenseOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: HouseExpenseWhereUniqueInput): [HouseExpense!]
+  houseExpensesCount(where: HouseExpenseWhereInput! = {}): Int
+  promoterPayment(where: PromoterPaymentWhereUniqueInput!): PromoterPayment
+  promoterPayments(where: PromoterPaymentWhereInput! = {}, orderBy: [PromoterPaymentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: PromoterPaymentWhereUniqueInput): [PromoterPayment!]
+  promoterPaymentsCount(where: PromoterPaymentWhereInput! = {}): Int
+  document(where: DocumentWhereUniqueInput!): Document
+  documents(where: DocumentWhereInput! = {}, orderBy: [DocumentOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DocumentWhereUniqueInput): [Document!]
+  documentsCount(where: DocumentWhereInput! = {}): Int
   offer(where: OfferWhereUniqueInput!): Offer
   offers(where: OfferWhereInput! = {}, orderBy: [OfferOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: OfferWhereUniqueInput): [Offer!]
   offersCount(where: OfferWhereInput! = {}): Int
@@ -6019,6 +6737,8 @@ type Query {
   ticketOrderView(orderId: ID!, proof: String): JSON
   myTicketOrders: JSON
   roomAvailability(roomId: ID!, from: String, days: Int): JSON
+  viewVenueDeal(token: String!): JSON
+  quoteVenueDeal(dealId: ID!, actuals: JSON): JSON
   storeLogo: StoreLogo!
 }
 
@@ -6178,6 +6898,7 @@ input OperatorCommandInput {
   data: JSON
   offerId: ID
   settlementId: ID
+  dealId: ID
   productionHoldId: ID
   seatingChartId: ID
   title: String

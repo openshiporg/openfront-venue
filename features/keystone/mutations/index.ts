@@ -15,7 +15,8 @@ import seedVenue from './seedVenue';
 import { constraintRefusal, constraintGraphQLError } from '../lib/constraint-errors';
 import { setRecordHidden } from './hidden';
 import { startTicketCheckout, completeTicketCheckout, lookupTicketOrder, transferTicket, refundTicketOrder, retryTicketRefund, ticketOrderView, myTicketOrders, resendOrderConfirmation } from './checkout';
-import { submitInquiry, workInquiry, roomAvailability } from './inquiries';
+import { submitInquiry, workInquiry, venueAvails, publicRooms } from './inquiries';
+import { venueDealMutations, viewVenueDeal, acceptVenueDeal, quoteVenueDeal } from './venueDeals';
 import { sendEmailConfirmation, confirmCustomerEmail } from './customers';
 
 const graphql = String.raw;
@@ -39,7 +40,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
   return mergeSchemas({
     schemas: [baseSchema],
     typeDefs: graphql`
-      input OperatorCommandInput { idempotencyKey: String! eventId: ID roomId: ID date: String rank: Int artistId: ID agencyId: ID expiresAt: String holdId: ID byHoldId: ID promoterId: ID notes: String phaseId: ID expenseId: ID data: JSON offerId: ID settlementId: ID productionHoldId: ID seatingChartId: ID title: String showAt: String doorsAt: String showTime: String doorsTime: String ageRestriction: String levelId: ID quantity: Int seatInventoryIds: [ID!] holdType: String releaseAt: String token: String ticketCode: String gate: String softGrossCents: Int hardGrossCents: Int sellerFeeCents: Int countIn: JSON countOut: JSON amountCents: Int reason: String approvedById: ID kind: String method: String reference: String status: String }
+      input OperatorCommandInput { idempotencyKey: String! eventId: ID roomId: ID date: String rank: Int artistId: ID agencyId: ID expiresAt: String holdId: ID byHoldId: ID promoterId: ID notes: String phaseId: ID expenseId: ID data: JSON offerId: ID settlementId: ID dealId: ID productionHoldId: ID seatingChartId: ID title: String showAt: String doorsAt: String showTime: String doorsTime: String ageRestriction: String levelId: ID quantity: Int seatInventoryIds: [ID!] holdType: String releaseAt: String token: String ticketCode: String gate: String softGrossCents: Int hardGrossCents: Int sellerFeeCents: Int countIn: JSON countOut: JSON amountCents: Int reason: String approvedById: ID kind: String method: String reference: String status: String }
       input UserUpdateProfileInput { email: String name: String password: String onboardingStatus: String }
       input CreateHoldInput { idempotencyKey: String! }
       input StartTicketCheckoutInput { holdId: ID! proof: String! email: String! name: String! ageAttested: Boolean idempotencyKey: String! }
@@ -62,7 +63,10 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         lookupTicketOrder(email: String!, orderNumber: String!): JSON
         ticketOrderView(orderId: ID!, proof: String): JSON
         myTicketOrders: JSON
-        roomAvailability(roomId: ID!, from: String, days: Int): JSON
+        venueAvails(from: String, to: String, roomId: ID): JSON
+        publicRooms: JSON
+        viewVenueDeal(token: String!): JSON
+        quoteVenueDeal(dealId: ID!, actuals: JSON): JSON
       }
       type Mutation {
         createGaHold(eventId: ID!, levelId: ID!, qty: Int!, presaleCode: String, idempotencyKey: String!): JSON
@@ -75,6 +79,8 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         resendOrderConfirmation(orderId: ID!): JSON
         setRecordHidden(list: String!, id: ID!, hidden: Boolean!, reason: String): JSON
         submitInquiry(input: JSON!): JSON
+        acceptVenueDeal(token: String!, name: String!, termsHash: String, idempotencyKey: String!): JSON
+        ${Object.keys(venueDealMutations).map(name => `${name}(input: OperatorCommandInput!): JSON`).join('\n        ')}
         workInquiry(input: JSON!): JSON
         sendEmailConfirmation: JSON
         confirmCustomerEmail(userId: ID!, proof: String!): JSON
@@ -103,7 +109,10 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         lookupTicketOrder: surfaceRefusals(lookupTicketOrder),
         ticketOrderView: surfaceRefusals(ticketOrderView),
         myTicketOrders: surfaceRefusals(myTicketOrders),
-        roomAvailability: surfaceRefusals(roomAvailability),
+        venueAvails: surfaceRefusals(venueAvails),
+        publicRooms: surfaceRefusals(publicRooms),
+        viewVenueDeal: surfaceRefusals(viewVenueDeal),
+        quoteVenueDeal: surfaceRefusals(quoteVenueDeal),
       },
       Mutation: surfaced({
         createGaHold: createHold,
@@ -112,7 +121,7 @@ export function extendGraphqlSchema(baseSchema: GraphQLSchema) {
         publishSeatingChart, requestRefundApproval, decideRefundApproval, issueDoorSale, issueComp, previewDoorSale, refundDoorSale, openCashDrawer, closeCashDrawer, forceCloseCashDrawer,
         updateActiveUser, submitInquiry, workInquiry,
         startTicketCheckout, completeTicketCheckout, transferTicket, refundTicketOrder, retryTicketRefund, resendOrderConfirmation, sendEmailConfirmation, confirmCustomerEmail, setRecordHidden,
-        ...editorMutations,
+        ...editorMutations, ...venueDealMutations, acceptVenueDeal,
         ...Object.fromEntries(operatorCommands.map(name => [name, operator(name)])),
       }),
     },

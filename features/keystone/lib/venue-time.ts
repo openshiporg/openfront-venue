@@ -23,3 +23,9 @@ function offsetMs(instant: number, timeZone: string) {
   const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
   return asUtc - Math.floor(instant / 1000) * 1000;
 }
+
+/** The calendar day (YYYY-MM-DD) an instant falls on at the venue. An 8 pm Los Angeles show is on its own day, not tomorrow in UTC. */
+export function localDay(instant: Date | string, timeZone: string) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: timeZone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(instant)).map(p => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}

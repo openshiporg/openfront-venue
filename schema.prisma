@@ -22,8 +22,11 @@ model User {
   emailVerifiedAt                  DateTime?
   emailConfirmationSentAt          DateTime?
   onboardingStatus                 String?           @default("not_started")
-  event_promoter                   Event[]           @relation("Event_promoter")
+  event_bookedBy                   Event[]           @relation("Event_bookedBy")
   inquiry_handledBy                Inquiry[]         @relation("Inquiry_handledBy")
+  promoterPayment_recordedBy       PromoterPayment[] @relation("PromoterPayment_recordedBy")
+  barSales_recordedBy              BarSales[]        @relation("BarSales_recordedBy")
+  document_uploadedBy              Document[]        @relation("Document_uploadedBy")
   inventoryHold_customer           InventoryHold[]   @relation("InventoryHold_customer")
   ticketOrder_customer             TicketOrder[]     @relation("TicketOrder_customer")
   scanEvent_scannedBy              ScanEvent[]       @relation("ScanEvent_scannedBy")
@@ -263,7 +266,9 @@ model Event {
   roomId               String?          @map("room")
   seatingChart         SeatingChart?    @relation("Event_seatingChart", fields: [seatingChartId], references: [id])
   seatingChartId       String?          @map("seatingChart")
-  promoter             User?            @relation("Event_promoter", fields: [promoterId], references: [id])
+  bookedBy             User?            @relation("Event_bookedBy", fields: [bookedById], references: [id])
+  bookedById           String?          @map("bookedBy")
+  promoter             Promoter?        @relation("Event_promoter", fields: [promoterId], references: [id])
   promoterId           String?          @map("promoter")
   eventArtist_event    EventArtist[]    @relation("EventArtist_event")
   dateHold_event       DateHold[]       @relation("DateHold_event")
@@ -280,11 +285,14 @@ model Event {
   merchSales_event     MerchSales[]     @relation("MerchSales_event")
   barSales_event       BarSales[]       @relation("BarSales_event")
   settlement_event     Settlement[]     @relation("Settlement_event")
+  venueDeal_event      VenueDeal[]      @relation("VenueDeal_event")
+  document_event       Document[]       @relation("Document_event")
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @default(now()) @updatedAt
 
   @@index([roomId])
   @@index([seatingChartId])
+  @@index([bookedById])
   @@index([promoterId])
 }
 
@@ -307,31 +315,32 @@ model EventArtist {
 }
 
 model DateHold {
-  id                String     @id @default(cuid())
-  rankKey           String?    @unique
-  rank              Int?       @default(0)
+  id                String      @id @default(cuid())
+  rankKey           String?     @unique
+  rank              Int?        @default(0)
   date              DateTime?
   expiresAt         DateTime?
-  status            String?    @default("held")
-  kind              String     @default("show")
+  status            String?     @default("held")
+  kind              String      @default("show")
   challengeDeadline DateTime?
-  challengedBy      DateHold?  @relation("DateHold_challengedBy", fields: [challengedById], references: [id])
-  challengedById    String?    @map("challengedBy")
-  challenges        DateHold[] @relation("DateHold_challengedBy")
-  notes             String     @default("")
-  releasedReason    String     @default("")
-  promoter          Promoter?  @relation("DateHold_promoter", fields: [promoterId], references: [id])
-  promoterId        String?    @map("promoter")
-  room              Room?      @relation("DateHold_room", fields: [roomId], references: [id])
-  roomId            String?    @map("room")
-  artist            Artist?    @relation("DateHold_artist", fields: [artistId], references: [id])
-  artistId          String?    @map("artist")
-  agency            Agency?    @relation("DateHold_agency", fields: [agencyId], references: [id])
-  agencyId          String?    @map("agency")
-  event             Event?     @relation("DateHold_event", fields: [eventId], references: [id])
-  eventId           String?    @map("event")
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @default(now()) @updatedAt
+  challengedBy      DateHold?   @relation("DateHold_challengedBy", fields: [challengedById], references: [id])
+  challengedById    String?     @map("challengedBy")
+  challenges        DateHold[]  @relation("DateHold_challengedBy")
+  notes             String      @default("")
+  releasedReason    String      @default("")
+  promoter          Promoter?   @relation("DateHold_promoter", fields: [promoterId], references: [id])
+  promoterId        String?     @map("promoter")
+  venueDeal_hold    VenueDeal[] @relation("VenueDeal_hold")
+  room              Room?       @relation("DateHold_room", fields: [roomId], references: [id])
+  roomId            String?     @map("room")
+  artist            Artist?     @relation("DateHold_artist", fields: [artistId], references: [id])
+  artistId          String?     @map("artist")
+  agency            Agency?     @relation("DateHold_agency", fields: [agencyId], references: [id])
+  agencyId          String?     @map("agency")
+  event             Event?      @relation("DateHold_event", fields: [eventId], references: [id])
+  eventId           String?     @map("event")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @default(now()) @updatedAt
 
   @@index([challengedById])
   @@index([promoterId])
@@ -342,17 +351,20 @@ model DateHold {
 }
 
 model Promoter {
-  id                String     @id @default(cuid())
-  company           String     @default("")
-  contactName       String     @default("")
-  email             String     @default("")
-  phone             String     @default("")
-  website           String     @default("")
-  notes             String     @default("")
-  dateHold_promoter DateHold[] @relation("DateHold_promoter")
-  inquiry_promoter  Inquiry[]  @relation("Inquiry_promoter")
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @default(now()) @updatedAt
+  id                 String      @id @default(cuid())
+  company            String      @default("")
+  contactName        String      @default("")
+  email              String      @default("")
+  phone              String      @default("")
+  website            String      @default("")
+  notes              String      @default("")
+  dateHold_promoter  DateHold[]  @relation("DateHold_promoter")
+  inquiry_promoter   Inquiry[]   @relation("Inquiry_promoter")
+  venueDeal_promoter VenueDeal[] @relation("VenueDeal_promoter")
+  event_promoter     Event[]     @relation("Event_promoter")
+  document_promoter  Document[]  @relation("Document_promoter")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @default(now()) @updatedAt
 }
 
 model Inquiry {
@@ -383,6 +395,121 @@ model Inquiry {
   @@index([roomId])
   @@index([promoterId])
   @@index([handledById])
+}
+
+model VenueDeal {
+  id                        String            @id @default(cuid())
+  event                     Event?            @relation("VenueDeal_event", fields: [eventId], references: [id])
+  eventId                   String?           @map("event")
+  hold                      DateHold?         @relation("VenueDeal_hold", fields: [holdId], references: [id])
+  holdId                    String?           @map("hold")
+  promoter                  Promoter?         @relation("VenueDeal_promoter", fields: [promoterId], references: [id])
+  promoterId                String?           @map("promoter")
+  version                   Int?              @default(1)
+  status                    String?           @default("draft")
+  dealType                  String?           @default("rental")
+  rentMode                  String?           @default("flat")
+  rentCents                 Int?              @default(0)
+  rentPercentBps            Int?              @default(0)
+  rentBase                  String            @default("")
+  rentBaseKind              String?           @default("net_of_tax_and_fees")
+  coProMode                 String?           @default("upside")
+  venueShareBps             Int?              @default(0)
+  contributedRevenues       Json?
+  barMode                   String?           @default("none")
+  barGuaranteeCents         Int?              @default(0)
+  barTiers                  Json?
+  facilityFeeCents          Int?              @default(0)
+  ticketFeeShareBps         Int?              @default(0)
+  depositCents              Int?              @default(0)
+  depositDueAt              DateTime?
+  balanceDueAt              DateTime?
+  insuranceRequired         Boolean           @default(true)
+  requiredLimitCents        Int?              @default(100000000)
+  issuer                    String?           @default("own")
+  notes                     String            @default("")
+  terms                     Json?
+  termsHash                 String            @default("")
+  acceptedByName            String            @default("")
+  acceptedAt                DateTime?
+  sentAt                    DateTime?
+  cancelReason              String            @default("")
+  publicTokenHash           String?           @unique
+  previousVersion           VenueDeal?        @relation("VenueDeal_previousVersion", fields: [previousVersionId], references: [id])
+  previousVersionId         String?           @map("previousVersion")
+  nextVersions              VenueDeal[]       @relation("VenueDeal_previousVersion")
+  houseExpense_venueDeal    HouseExpense[]    @relation("HouseExpense_venueDeal")
+  promoterPayment_venueDeal PromoterPayment[] @relation("PromoterPayment_venueDeal")
+  settlement_venueDeal      Settlement[]      @relation("Settlement_venueDeal")
+  document_venueDeal        Document[]        @relation("Document_venueDeal")
+  currencyCode              String            @default("USD")
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @default(now()) @updatedAt
+
+  @@index([eventId])
+  @@index([holdId])
+  @@index([promoterId])
+  @@index([previousVersionId])
+}
+
+model HouseExpense {
+  id          String     @id @default(cuid())
+  venueDeal   VenueDeal? @relation("HouseExpense_venueDeal", fields: [venueDealId], references: [id])
+  venueDealId String?    @map("venueDeal")
+  label       String     @default("")
+  category    String?    @default("other")
+  basis       String?    @default("flat")
+  role        String     @default("")
+  amountCents Int?
+  rateCents   Int?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
+
+  @@index([venueDealId])
+}
+
+model PromoterPayment {
+  id             String     @id @default(cuid())
+  venueDeal      VenueDeal? @relation("PromoterPayment_venueDeal", fields: [venueDealId], references: [id])
+  venueDealId    String?    @map("venueDeal")
+  direction      String?    @default("in")
+  kind           String?    @default("deposit")
+  amountCents    Int?       @default(0)
+  method         String?    @default("transfer")
+  reference      String     @default("")
+  recordedBy     User?      @relation("PromoterPayment_recordedBy", fields: [recordedById], references: [id])
+  recordedById   String?    @map("recordedBy")
+  idempotencyKey String?    @unique
+  currencyCode   String     @default("USD")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @default(now()) @updatedAt
+
+  @@index([venueDealId])
+  @@index([recordedById])
+}
+
+model Document {
+  id            String     @id @default(cuid())
+  title         String     @default("")
+  kind          String?    @default("other")
+  file_filesize Int?
+  file_filename String?
+  event         Event?     @relation("Document_event", fields: [eventId], references: [id])
+  eventId       String?    @map("event")
+  venueDeal     VenueDeal? @relation("Document_venueDeal", fields: [venueDealId], references: [id])
+  venueDealId   String?    @map("venueDeal")
+  promoter      Promoter?  @relation("Document_promoter", fields: [promoterId], references: [id])
+  promoterId    String?    @map("promoter")
+  barSales      BarSales?  @relation("BarSales_report")
+  uploadedBy    User?      @relation("Document_uploadedBy", fields: [uploadedById], references: [id])
+  uploadedById  String?    @map("uploadedBy")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @default(now()) @updatedAt
+
+  @@index([eventId])
+  @@index([venueDealId])
+  @@index([promoterId])
+  @@index([uploadedById])
 }
 
 model Offer {
@@ -740,15 +867,24 @@ model MerchSales {
 }
 
 model BarSales {
-  id               String   @id @default(cuid())
-  grossCents       Int?     @default(0)
-  promoterShareBps Int?     @default(0)
-  event            Event?   @relation("BarSales_event", fields: [eventId], references: [id])
-  eventId          String?  @map("event")
-  currencyCode     String   @default("USD")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @default(now()) @updatedAt
+  id               String    @id @default(cuid())
+  grossCents       Int?      @default(0)
+  compsCents       Int?      @default(0)
+  voidsCents       Int?      @default(0)
+  taxCents         Int?      @default(0)
+  netCents         Int?      @default(0)
+  promoterShareBps Int?      @default(0)
+  report           Document? @relation("BarSales_report", fields: [reportId], references: [id])
+  reportId         String?   @unique @map("report")
+  recordedBy       User?     @relation("BarSales_recordedBy", fields: [recordedById], references: [id])
+  recordedById     String?   @map("recordedBy")
+  event            Event?    @relation("BarSales_event", fields: [eventId], references: [id])
+  eventId          String?   @map("event")
+  currencyCode     String    @default("USD")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
 
+  @@index([recordedById])
   @@index([eventId])
 }
 
@@ -775,6 +911,10 @@ model Settlement {
   promoterNetCents           Int?             @default(0)
   computedSnapshot           Json?
   approvals                  Json?
+  party                      String?          @default("artist")
+  venueDeal                  VenueDeal?       @relation("Settlement_venueDeal", fields: [venueDealId], references: [id])
+  venueDealId                String?          @map("venueDeal")
+  balanceDuePromoterCents    Int?             @default(0)
   status                     String?          @default("draft")
   event                      Event?           @relation("Settlement_event", fields: [eventId], references: [id])
   eventId                    String?          @map("event")
@@ -787,6 +927,7 @@ model Settlement {
   createdAt                  DateTime         @default(now())
   updatedAt                  DateTime         @default(now()) @updatedAt
 
+  @@index([venueDealId])
   @@index([eventId])
   @@index([previousVersionId])
 }
@@ -796,6 +937,7 @@ model SettlementLine {
   label             String      @default("")
   sourceRef         String      @default("")
   reason            String      @default("")
+  rule              String      @default("")
   amountCents       Int?        @default(0)
   roundingRemainder Int?        @default(0)
   kind              String?     @default("gross")

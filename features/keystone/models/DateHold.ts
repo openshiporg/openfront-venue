@@ -19,6 +19,7 @@ export const DateHold = list({
   notes: text({ ui: { displayMode: 'textarea' } }),
   releasedReason: text({ access: { create: () => false, update: () => false } }),
   promoter: relationship({ ref: 'Promoter.dateHold_promoter', many: false }),
+  venueDeal_hold: relationship({ ref: 'VenueDeal.hold', many: true }),
   room: relationship({ ref: 'Room.dateHold_room', many: false }),
   artist: relationship({ ref: 'Artist.dateHold_artist', many: false }),
   agency: relationship({ ref: 'Agency.dateHold_agency', many: false }),
