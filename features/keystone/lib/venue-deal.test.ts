@@ -35,6 +35,22 @@ test('bar split: tiers apply to net bar at each threshold, like brackets', () =>
   assert.equal(barCommission([{ fromCents: 100000, bps: 2000 }], 100033).cents, 6); // 20% of 33 cents = 6.6 → 6
 });
 
+test('bar split methods on the same net: bracket pays each band its rate, whole pays the reached rate on all net bar', () => {
+  const tiers = [{ fromCents: 0, bps: 0 }, { fromCents: 500000, bps: 1000 }, { fromCents: 1000000, bps: 1500 }];
+  const net = 1200000; // $12,000 net bar
+  assert.equal(barCommission(tiers, net, 'bracket').cents, 80000); // 10% of $5,000 + 15% of $2,000 = $800
+  const whole = barCommission(tiers, net, 'whole');
+  assert.equal(whole.cents, 180000); // 15% of all $12,000 = $1,800
+  assert.match(whole.rule, /15% of all net bar \$12,000\.00/);
+  assert.equal(barCommission(tiers, 499999, 'whole').cents, 0);
+  assert.equal(barCommission(tiers, 500000, 'whole').cents, 50000); // the step: 10% of all $5,000
+  assert.equal(validateDealTerms({ dealType: 'rental', rentMode: 'flat', rentCents: 100, barMode: 'split', barTiers: tiers }, 1).barTierMethod, 'bracket');
+  assert.equal(validateDealTerms({ dealType: 'rental', rentMode: 'flat', rentCents: 100, barMode: 'split', barTiers: tiers, barTierMethod: 'whole' }, 1).barTierMethod, 'whole');
+  assert.throws(() => validateDealTerms({ dealType: 'rental', rentMode: 'flat', rentCents: 100, barMode: 'split', barTiers: tiers, barTierMethod: 'flat' }, 1));
+  const s = promoterStatement(validateDealTerms({ dealType: 'rental', rentMode: 'flat', rentCents: 0, barMode: 'split', barTiers: tiers, barTierMethod: 'whole', insuranceRequired: false }, 1), actuals({ netBarCents: net }));
+  assert.equal(s.lines.find(l => l.kind === 'bar_commission')?.amountCents, -180000);
+});
+
 test('co-pro: upside only never makes the venue share negative; up and down shares a loss', () => {
   assert.equal(coProShare('upside', 3000, 1000000).cents, 300000);
   assert.equal(coProShare('upside', 3000, -1000000).cents, 0);

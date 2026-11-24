@@ -5,6 +5,11 @@ export const humanCode = (prefix: string) => `${prefix}-${randomBytes(8).toStrin
 function secret() { const value = process.env.SESSION_SECRET; if (!value || value.length < 32) throw new Error('SESSION_SECRET required'); return value; }
 /** The secret a ticket's QR code carries: derived from the ticket code, so the buyer's order page and email can show it again; only its hash is stored. */
 export const ticketToken = (ticketCode: string) => createHmac('sha256', secret()).update(`venue-ticket\0${ticketCode}`).digest('hex');
+/**
+ * A copyable link secret (deal, advance, proposal): an HMAC of the record id and a per-send nonce. The nonce may be stored
+ * (in the idempotency reply) so a replay rebuilds the same link; the token itself is never written anywhere, only its digest.
+ */
+export const linkToken = (kind: string, id: string, nonce: string) => createHmac('sha256', secret()).update(`venue-link\0${kind}\0${id}\0${nonce}`).digest('base64url');
 /** What the door scans for this ticket: the QR secret, or the printed code for tickets issued before QR codes. */
 export const ticketScanValue = (ticket: { ticketCode: string; tokenHash?: string | null }) => (ticket.tokenHash && ticket.tokenHash === digest(ticketToken(ticket.ticketCode)) ? ticketToken(ticket.ticketCode) : ticket.ticketCode);
 /** Restaurant cartProof pattern: signed, expiring and resource-bound. */

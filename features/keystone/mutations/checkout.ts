@@ -211,11 +211,12 @@ export async function transferTicket(_: any, { input }: any, context: any) {
     const code = humanCode('TK'); const token = ticketToken(code);
     const fresh = await tx.ticket.create({ data: { orderId: old.orderId, eventId: old.eventId, lineId: old.lineId, seatInventoryId: old.seatInventoryId, ticketCode: code, tokenHash: digest(token), holderName: toName || '', holderEmail: toEmail.toLowerCase(), status: 'valid', transferredFromId: old.id } });
     await appendAuditEvent(tx, context.session?.itemId, { action: 'ticket.transferred', targetList: 'Ticket', targetId: fresh.id, before: { ticketCode }, after: { ticketCode: code } });
-    return { ticketCode: code, token, status: 'valid' };
+    // The idempotency reply keeps only the code; the QR secret is derived from it below, so no table holds the token.
+    return { ticketCode: code, status: 'valid' };
   });
   // The new holder gets the ticket by email; the page says whether that email went out.
   const mail = await sendTransferEmail(context, { orderId: order.id, ticketCode: moved.ticketCode, fromCode: ticketCode });
-  return { ...moved, emailed: mail.sent };
+  return { ...moved, token: ticketToken(moved.ticketCode), emailed: mail.sent };
 }
 
 export async function refundTicketOrder(_: any, { input }: any, context: any) {

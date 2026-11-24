@@ -419,6 +419,7 @@ model VenueDeal {
   barMode                   String?           @default("none")
   barGuaranteeCents         Int?              @default(0)
   barTiers                  Json?
+  barTierMethod             String?           @default("bracket")
   facilityFeeCents          Int?              @default(0)
   ticketFeeShareBps         Int?              @default(0)
   depositCents              Int?              @default(0)
@@ -489,22 +490,25 @@ model PromoterPayment {
 }
 
 model Document {
-  id            String     @id @default(cuid())
-  title         String     @default("")
-  kind          String?    @default("other")
-  file_filesize Int?
-  file_filename String?
-  event         Event?     @relation("Document_event", fields: [eventId], references: [id])
-  eventId       String?    @map("event")
-  venueDeal     VenueDeal? @relation("Document_venueDeal", fields: [venueDealId], references: [id])
-  venueDealId   String?    @map("venueDeal")
-  promoter      Promoter?  @relation("Document_promoter", fields: [promoterId], references: [id])
-  promoterId    String?    @map("promoter")
-  barSales      BarSales?  @relation("BarSales_report")
-  uploadedBy    User?      @relation("Document_uploadedBy", fields: [uploadedById], references: [id])
-  uploadedById  String?    @map("uploadedBy")
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @default(now()) @updatedAt
+  id           String     @id @default(cuid())
+  title        String     @default("")
+  kind         String?    @default("other")
+  filename     String     @default("")
+  mimeType     String     @default("")
+  sizeBytes    Int?       @default(0)
+  sha256       String     @default("")
+  content      String     @default("")
+  event        Event?     @relation("Document_event", fields: [eventId], references: [id])
+  eventId      String?    @map("event")
+  venueDeal    VenueDeal? @relation("Document_venueDeal", fields: [venueDealId], references: [id])
+  venueDealId  String?    @map("venueDeal")
+  promoter     Promoter?  @relation("Document_promoter", fields: [promoterId], references: [id])
+  promoterId   String?    @map("promoter")
+  barSales     BarSales?  @relation("BarSales_report")
+  uploadedBy   User?      @relation("Document_uploadedBy", fields: [uploadedById], references: [id])
+  uploadedById String?    @map("uploadedBy")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @default(now()) @updatedAt
 
   @@index([eventId])
   @@index([venueDealId])

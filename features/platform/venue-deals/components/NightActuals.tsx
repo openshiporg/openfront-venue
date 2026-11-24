@@ -8,19 +8,14 @@ import { runCommand } from '../../lib/commands';
 const cents = (v: string) => (v.trim() === '' ? 0 : Math.round(Number(v) * 100));
 const dollars = (c?: number | null) => (c ? (c / 100).toFixed(2) : '');
 
-/** Upload one file to the private store as a Document, through the GraphQL multipart upload. Returns the Document id. */
+/** Upload one file to the venue's private document store. Returns the Document id. */
 export async function uploadDocument(file: File, title: string, kind: string, eventId: string): Promise<string> {
   const body = new FormData();
-  body.append('operations', JSON.stringify({
-    query: 'mutation($data: DocumentCreateInput!) { createDocument(data: $data) { id } }',
-    variables: { data: { title, kind, event: { connect: { id: eventId } }, file: { upload: null } } },
-  }));
-  body.append('map', JSON.stringify({ 0: ['variables.data.file.upload'] }));
-  body.append('0', file);
-  const res = await fetch('/api/graphql', { method: 'POST', body, credentials: 'include', headers: { 'apollo-require-preflight': 'true' } });
-  const json = await res.json();
-  if (json.errors?.length) throw new Error(json.errors[0].message);
-  return json.data.createDocument.id;
+  body.append('file', file); body.append('title', title); body.append('kind', kind); body.append('eventId', eventId);
+  const res = await fetch('/api/documents', { method: 'POST', body, credentials: 'include' });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'The file could not be uploaded');
+  return json.id;
 }
 
 /** Bar totals at close, from the POS report, with the report attached. Net = gross − comps − voids − tax. */

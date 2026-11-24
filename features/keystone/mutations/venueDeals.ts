@@ -1,6 +1,6 @@
 import { command, transition } from '../lib/transaction';
 import { appendAuditEvent } from '../lib/audit';
-import { canonicalDigest, digest, opaqueToken } from '../lib/guest-proof';
+import { canonicalDigest, digest, opaqueToken, linkToken } from '../lib/guest-proof';
 import { authorize, nextSettlementVersion, settlePromoterDeal } from './operators';
 import { validateDealTerms, promoterStatement, type DealTerms, type StatementActuals } from '../lib/venue-deal';
 import { FROZEN_SETTLEMENT } from '../lib/editors';
@@ -11,16 +11,16 @@ import type { Permission } from '../access';
  * Every write runs in `command`: one advisory lock, an idempotency key, explicit state checks and an audit row.
  */
 type Ctx = { tx: any; input: any; actor: string | null };
-function staff(operation: string, permission: Permission, lockOf: (input: any) => string, run: (c: Ctx) => Promise<any>) {
+function staff(operation: string, permission: Permission, lockOf: (input: any) => string, run: (c: Ctx) => Promise<any>, present: (result: any) => any = r => r) {
   return async (_: any, { input }: any, context: any) => {
     authorize(context, permission);
     if (!input?.idempotencyKey) throw new Error('Idempotency key required');
-    return command(context, { operation, idempotencyKey: input.idempotencyKey, lock: lockOf(input), params: input }, tx => run({ tx, input, actor: context.session.itemId }));
+    return present(await command(context, { operation, idempotencyKey: input.idempotencyKey, lock: lockOf(input), params: input }, tx => run({ tx, input, actor: context.session.itemId })));
   };
 }
 const audit = (tx: any, actor: string | null, action: string, list: string, id: string, after: any, reason = '') => appendAuditEvent(tx, actor, { action, targetList: list, targetId: id, after, reason });
 
-const TERM_FIELDS = ['dealType', 'rentMode', 'rentCents', 'rentPercentBps', 'rentBase', 'rentBaseKind', 'coProMode', 'venueShareBps', 'contributedRevenues', 'barMode', 'barGuaranteeCents', 'barTiers', 'facilityFeeCents', 'ticketFeeShareBps', 'depositCents', 'depositDueAt', 'balanceDueAt', 'insuranceRequired', 'requiredLimitCents', 'issuer', 'notes'] as const;
+const TERM_FIELDS = ['dealType', 'rentMode', 'rentCents', 'rentPercentBps', 'rentBase', 'rentBaseKind', 'coProMode', 'venueShareBps', 'contributedRevenues', 'barMode', 'barGuaranteeCents', 'barTiers', 'barTierMethod', 'facilityFeeCents', 'ticketFeeShareBps', 'depositCents', 'depositDueAt', 'balanceDueAt', 'insuranceRequired', 'requiredLimitCents', 'issuer', 'notes'] as const;
 function columns(terms: DealTerms) {
   const out: any = {};
   for (const k of TERM_FIELDS) out[k] = (terms as any)[k];
@@ -84,13 +84,13 @@ export const sendVenueDeal = staff('sendVenueDeal', 'canManageVenueDeals', i => 
   if (!['draft', 'sent'].includes(deal.status)) throw new Error(deal.status === 'accepted' ? 'The promoter has accepted this deal; revise it to change terms' : `A ${deal.status} deal cannot be sent`);
   const terms = await dealTerms(tx, deal);
   if (terms.dealType === 'in_house') throw new Error('An in-house show has no promoter to accept; book the artist with an offer');
-  const token = opaqueToken();
-  const data = { terms, termsHash: canonicalDigest(terms), publicTokenHash: digest(token), sentAt: new Date() };
+  const linkNonce = opaqueToken();
+  const data = { terms, termsHash: canonicalDigest(terms), publicTokenHash: digest(linkToken('deal', deal.id, linkNonce)), sentAt: new Date() };
   if (deal.status === 'draft') await transition(tx, 'venueDeal', deal.id, 'draft', 'sent', actor, '', data);
   else { await tx.venueDeal.update({ where: { id: deal.id }, data }); await audit(tx, actor, 'sendVenueDeal', 'VenueDeal', deal.id, { resent: true }); }
-  // The token is returned once; only its digest is stored. The idempotency replay returns the same link.
-  return { id: deal.id, status: 'sent', path: `/deals/${token}`, termsHash: data.termsHash };
-});
+  // The idempotency reply keeps only the nonce; the link is derived outside the transaction, so no table holds the token.
+  return { id: deal.id, status: 'sent', linkNonce, termsHash: data.termsHash };
+}, ({ linkNonce, ...r }) => ({ ...r, path: `/deals/${linkToken('deal', r.id, linkNonce)}` }));
 
 export const cancelVenueDeal = staff('cancelVenueDeal', 'canManageVenueDeals', i => `deal:${i.dealId}`, async ({ tx, input, actor }) => {
   const deal = await tx.venueDeal.findUnique({ where: { id: input.dealId } });

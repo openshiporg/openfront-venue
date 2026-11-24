@@ -1,18 +1,22 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { venueDealMutations, viewVenueDeal, acceptVenueDeal } from './venueDeals';
 import { venueAvails } from './inquiries';
 import { operator } from './operators';
 import { runHoldCommand } from './calendar';
 import { checkedClient } from '../lib/transaction';
-import { canonicalDigest } from '../lib/guest-proof';
+import { canonicalDigest, createProof, digest, ticketToken } from '../lib/guest-proof';
+import { transferTicket } from './checkout';
+import { storeDocument, readDocument } from '../lib/documents';
 
 /**
  * Venue deals, bar totals, promoter payments and the promoter settlement, run as the real resolvers against a migrated
  * Postgres schema named by VENUE_TEST_DATABASE_URL (scratch database, schema `dbtest`). Skipped without it, never faked.
  */
+// Link and ticket secrets are HMACs under SESSION_SECRET, as on a live deployment; a run without one gets a fresh random secret.
+process.env.SESSION_SECRET ||= randomBytes(32).toString('hex');
 const url = process.env.VENUE_TEST_DATABASE_URL || '';
 const enabled = /^postgres(ql)?:\/\//.test(url) && /[?&]schema=dbtest\b/.test(url);
 const suite = enabled ? test : test.skip;
@@ -118,4 +122,47 @@ suite('promoter settlement: lines sum to the balance, a signed statement is froz
   assert.equal((await prisma.event.findUnique({ where: { id: eventId } }))?.status, 'settled');
   const view = await viewVenueDeal(null, { token: sent.path.split('/').pop() }, guest);
   assert.ok((view.settlement?.lines.length || 0) > 0);
+});
+
+suite('no link secret is written to the idempotency table: a deal link and a transferred ticket keep only a nonce or a code', async () => {
+  const { eventId } = await bookedRental(ahead(75));
+  const draft = await m('saveVenueDeal', { eventId, data: { dealType: 'rental', rentMode: 'flat', rentCents: 200000 } });
+  const sendKey = key();
+  const sent = await venueDealMutations.sendVenueDeal(null, { input: { idempotencyKey: sendKey, dealId: draft.id } }, staff);
+  const token = sent.path.split('/').pop()!;
+  assert.ok(token.length >= 32);
+  const stored = await prisma.idempotencyKey.findUnique({ where: { idempotencyKey: sendKey } });
+  assert.ok(stored, 'the send is recorded for replay');
+  assert.ok(!JSON.stringify(stored).includes(token), 'the deal link token is not in IdempotencyKey');
+  const again = await venueDealMutations.sendVenueDeal(null, { input: { idempotencyKey: sendKey, dealId: draft.id } }, staff);
+  assert.equal(again.path, sent.path, 'a replay rebuilds the same link');
+  assert.equal((await viewVenueDeal(null, { token }, guest))?.version, 1);
+
+  const order = await prisma.ticketOrder.create({ data: { eventId, status: 'paid', guestEmail: 'buyer@example.com', guestName: 'Buyer', orderNumber: `VT-${Date.now()}` } as any });
+  const code = `TK-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+  await prisma.ticket.create({ data: { orderId: order.id, eventId, ticketCode: code, tokenHash: digest(ticketToken(code)), status: 'valid' } as any });
+  const moveKey = key();
+  const moved = await transferTicket(null, { input: { ticketCode: code, orderId: order.id, proof: createProof(order.id), toEmail: 'friend@example.com', toName: 'Friend', idempotencyKey: moveKey } }, guest);
+  assert.equal(moved.token, ticketToken(moved.ticketCode));
+  const fresh = await prisma.ticket.findUnique({ where: { ticketCode: moved.ticketCode } });
+  assert.equal(fresh?.tokenHash, digest(moved.token));
+  const row = await prisma.idempotencyKey.findUnique({ where: { idempotencyKey: moveKey } });
+  assert.ok(row && !JSON.stringify(row).includes(moved.token), 'the new ticket token is not in IdempotencyKey');
+});
+
+suite('documents are stored in the database: a POS report uploads and reads back with no storage service set up', async () => {
+  for (const k of ['S3_BUCKET_NAME', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY', 'S3_ENDPOINT']) delete process.env[k];
+  const { eventId } = await bookedRental(ahead(80));
+  const bytes = new TextEncoder().encode('Item,Qty,Net\nDraft lager,410,2870.00\n');
+  const doc = await storeDocument(prisma, staff.session.itemId, { bytes, filename: '../../etc/pos report.csv', mimeType: 'text/csv', kind: 'pos_report', title: 'POS close', eventId });
+  assert.equal(doc.filename, 'pos report.csv', 'no path survives in the name');
+  assert.equal(doc.sizeBytes, bytes.byteLength);
+  const back = await readDocument(prisma, doc.id);
+  assert.equal(Buffer.compare(back!.bytes, Buffer.from(bytes)), 0);
+  await assert.rejects(storeDocument(prisma, staff.session.itemId, { bytes: new Uint8Array(0), filename: 'x.csv' }), /empty/);
+  await assert.rejects(storeDocument(prisma, staff.session.itemId, { bytes: new Uint8Array(10 * 1024 * 1024 + 1), filename: 'big.pdf' }), /10 MB/);
+  const bar = await m('recordBarSales', { eventId, data: { grossCents: 300000, compsCents: 5000, voidsCents: 2000, taxCents: 0, reportId: doc.id } });
+  const row = await prisma.barSales.findFirst({ where: { eventId }, include: { report: true } });
+  assert.equal(row?.report?.id, doc.id); assert.equal(row?.netCents, 293000); assert.ok(bar);
+  assert.equal(await prisma.auditEvent.count({ where: { targetList: 'Document', targetId: doc.id, action: 'document.uploaded' } }), 1);
 });

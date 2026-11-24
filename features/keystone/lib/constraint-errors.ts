@@ -72,6 +72,8 @@ export const CONSTRAINT_MESSAGES: Record<string, Rule> = {
   VenueDeal_event_version_key: { code: 'VENUE_DUPLICATE_VERSION', message: 'That deal version already exists; reload and revise the latest.' },
   VenueDeal_one_live_per_event: { code: 'VENUE_DEAL_EXISTS', message: 'This event already has a live venue deal; revise it.' },
   venue_promoter_payment_valid: { code: 'VENUE_INVALID_AMOUNT', message: 'A promoter payment needs an amount above zero; a payout goes out and a deposit or balance comes in.' },
+  venue_deal_bar_tier_method: { code: 'VENUE_INVALID_TERMS', message: 'A bar split pays by bracket or on all net bar.' },
+  venue_document_valid: { code: 'VENUE_INVALID_FILE', message: 'Files can be at most 10 MB.' },
   venue_bar_net: { code: 'VENUE_INVALID_AMOUNT', message: 'Bar net must equal gross less comps, voids and tax, and none may be negative.' },
   VenueDeal_publicTokenHash_key: { code: 'VENUE_RETRY', message: 'That link could not be issued. Send the deal again.' },
   PromoterPayment_idempotencyKey_key: { code: 'VENUE_DUPLICATE_PAYMENT', message: 'That payment is already recorded.' },

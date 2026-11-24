@@ -23,7 +23,9 @@ export async function DealPage({ params }: { params: Promise<{ token: string }> 
   if (t.dealType === 'rental') items.push(['Rent', t.rentMode === 'flat' ? usd(t.rentCents) : t.rentMode === 'versus' ? `The greater of ${usd(t.rentCents)} or ${pct(t.rentPercentBps)} of ${t.rentBase}` : `${usd(t.rentCents)} plus ${pct(t.rentPercentBps)} of ${t.rentBase}`]);
   if (t.dealType === 'co_pro') items.push(['Co-promotion', `The venue takes ${pct(t.venueShareBps)} of the net (${(t.contributedRevenues || []).join(' and ')} less house and show costs), ${t.coProMode === 'upside' ? 'and never shares a loss' : 'and shares a loss in the same proportion'}`]);
   if (t.barMode === 'guarantee') items.push(['Bar guarantee', `Net bar sales of at least ${usd(t.barGuaranteeCents)}; you pay any shortfall`]);
-  if (t.barMode === 'split') items.push(['Bar split', (t.barTiers || []).map((x: any) => `${pct(x.bps)} of net bar from ${usd(x.fromCents)}`).join('; ')]);
+  if (t.barMode === 'split') items.push(['Bar split', t.barTierMethod === 'whole'
+    ? `The venue pays you a percentage of ALL net bar sales, set by the highest level reached: ${(t.barTiers || []).map((x: any) => `${pct(x.bps)} from ${usd(x.fromCents)}`).join('; ')}`
+    : `Each percentage applies only to the net bar sales in its band: ${(t.barTiers || []).map((x: any, i: number, all: any[]) => `${pct(x.bps)} of net bar from ${usd(x.fromCents)}${all[i + 1] ? ` to ${usd(all[i + 1].fromCents)}` : ' up'}`).join('; ')}`]);
   if (t.facilityFeeCents) items.push(['Facility fee', `${usd(t.facilityFeeCents)} per ticket sold`]);
   if (t.ticketFeeShareBps) items.push(['Ticket fee share', `${pct(t.ticketFeeShareBps)} of the ticket seller's service fees`]);
   for (const h of t.houseExpenses || []) items.push([h.label, h.basis === 'flat' ? usd(h.amountCents) : `Clocked ${label(h.role)} hours × ${h.rateCents !== undefined ? `${usd(h.rateCents)} an hour` : 'the staff rate'}`]);

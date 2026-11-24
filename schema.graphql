@@ -2471,6 +2471,7 @@ type VenueDeal {
   barMode: String
   barGuaranteeCents: Int
   barTiers: JSON
+  barTierMethod: String
   facilityFeeCents: Int
   ticketFeeShareBps: Int
   depositCents: Int
@@ -2528,6 +2529,7 @@ input VenueDealWhereInput {
   venueShareBps: IntNullableFilter
   barMode: StringNullableFilter
   barGuaranteeCents: IntNullableFilter
+  barTierMethod: StringNullableFilter
   facilityFeeCents: IntNullableFilter
   ticketFeeShareBps: IntNullableFilter
   depositCents: IntNullableFilter
@@ -2574,6 +2576,7 @@ input VenueDealOrderByInput {
   venueShareBps: OrderDirection
   barMode: OrderDirection
   barGuaranteeCents: OrderDirection
+  barTierMethod: OrderDirection
   facilityFeeCents: OrderDirection
   ticketFeeShareBps: OrderDirection
   depositCents: OrderDirection
@@ -2612,6 +2615,7 @@ input VenueDealUpdateInput {
   barMode: String
   barGuaranteeCents: Int
   barTiers: JSON
+  barTierMethod: String
   facilityFeeCents: Int
   ticketFeeShareBps: Int
   depositCents: Int
@@ -2675,6 +2679,7 @@ input VenueDealCreateInput {
   barMode: String
   barGuaranteeCents: Int
   barTiers: JSON
+  barTierMethod: String
   facilityFeeCents: Int
   ticketFeeShareBps: Int
   depositCents: Int
@@ -2874,7 +2879,10 @@ type Document {
   id: ID!
   title: String
   kind: String
-  file: FileFieldOutput
+  filename: String
+  mimeType: String
+  sizeBytes: Int
+  sha256: String
   event: Event
   venueDeal: VenueDeal
   promoter: Promoter
@@ -2882,12 +2890,6 @@ type Document {
   uploadedBy: User
   createdAt: DateTime
   updatedAt: DateTime
-}
-
-type FileFieldOutput {
-  filename: String!
-  filesize: Int!
-  url: String!
 }
 
 input DocumentWhereUniqueInput {
@@ -2902,6 +2904,10 @@ input DocumentWhereInput {
   id: IDFilter
   title: StringFilter
   kind: StringNullableFilter
+  filename: StringFilter
+  mimeType: StringFilter
+  sizeBytes: IntNullableFilter
+  sha256: StringFilter
   event: EventWhereInput
   venueDeal: VenueDealWhereInput
   promoter: PromoterWhereInput
@@ -2915,6 +2921,10 @@ input DocumentOrderByInput {
   id: OrderDirection
   title: OrderDirection
   kind: OrderDirection
+  filename: OrderDirection
+  mimeType: OrderDirection
+  sizeBytes: OrderDirection
+  sha256: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
@@ -2922,7 +2932,10 @@ input DocumentOrderByInput {
 input DocumentUpdateInput {
   title: String
   kind: String
-  file: FileFieldInput
+  filename: String
+  mimeType: String
+  sizeBytes: Int
+  sha256: String
   event: EventRelateToOneForUpdateInput
   venueDeal: VenueDealRelateToOneForUpdateInput
   promoter: PromoterRelateToOneForUpdateInput
@@ -2930,10 +2943,6 @@ input DocumentUpdateInput {
   uploadedBy: UserRelateToOneForUpdateInput
   createdAt: DateTime
   updatedAt: DateTime
-}
-
-input FileFieldInput {
-  upload: Upload!
 }
 
 input BarSalesRelateToOneForUpdateInput {
@@ -2950,7 +2959,10 @@ input DocumentUpdateArgs {
 input DocumentCreateInput {
   title: String
   kind: String
-  file: FileFieldInput
+  filename: String
+  mimeType: String
+  sizeBytes: Int
+  sha256: String
   event: EventRelateToOneForCreateInput
   venueDeal: VenueDealRelateToOneForCreateInput
   promoter: PromoterRelateToOneForCreateInput
@@ -6736,7 +6748,8 @@ type Query {
   lookupTicketOrder(email: String!, orderNumber: String!): JSON
   ticketOrderView(orderId: ID!, proof: String): JSON
   myTicketOrders: JSON
-  roomAvailability(roomId: ID!, from: String, days: Int): JSON
+  venueAvails(from: String, to: String, roomId: ID): JSON
+  publicRooms: JSON
   viewVenueDeal(token: String!): JSON
   quoteVenueDeal(dealId: ID!, actuals: JSON): JSON
   storeLogo: StoreLogo!

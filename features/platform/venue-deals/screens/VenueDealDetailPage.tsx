@@ -7,14 +7,14 @@ import { VenueDealEditor } from '../components/VenueDealEditor';
 import { VenueDealActions } from '../components/VenueDealActions';
 import { BarSalesForm, BuildStatement } from '../components/NightActuals';
 
-const DEAL = 'id status version dealType issuer rentMode rentCents rentPercentBps rentBase rentBaseKind coProMode venueShareBps contributedRevenues barMode barGuaranteeCents barTiers facilityFeeCents ticketFeeShareBps depositCents depositDueAt balanceDueAt insuranceRequired requiredLimitCents notes termsHash acceptedByName acceptedAt sentAt cancelReason createdAt promoter { id company } houseExpense_venueDeal { id label category basis role amountCents rateCents } promoterPayment_venueDeal(orderBy: [{ createdAt: asc }]) { id direction kind amountCents method reference createdAt }';
+const DEAL = 'id status version dealType issuer rentMode rentCents rentPercentBps rentBase rentBaseKind coProMode venueShareBps contributedRevenues barMode barGuaranteeCents barTiers barTierMethod facilityFeeCents ticketFeeShareBps depositCents depositDueAt balanceDueAt insuranceRequired requiredLimitCents notes termsHash acceptedByName acceptedAt sentAt cancelReason createdAt promoter { id company } houseExpense_venueDeal { id label category basis role amountCents rateCents } promoterPayment_venueDeal(orderBy: [{ createdAt: asc }]) { id direction kind amountCents method reference createdAt }';
 
 function terms(d: any): string[] {
   const out: string[] = [];
   if (d.dealType === 'rental') out.push(d.rentMode === 'flat' ? `Flat rent ${money(d.rentCents)}` : `${d.rentMode === 'versus' ? 'Greater of' : ''} ${money(d.rentCents)} ${d.rentMode === 'versus' ? 'or' : 'plus'} ${d.rentPercentBps / 100}% of ${d.rentBase}`.trim());
   if (d.dealType === 'co_pro') out.push(`Venue takes ${d.venueShareBps / 100}% of net (${(d.contributedRevenues || ['tickets']).join(' and ')}), ${d.coProMode === 'upside' ? 'never below zero' : 'sharing losses'}`);
   if (d.barMode === 'guarantee') out.push(`Bar guarantee ${money(d.barGuaranteeCents)} on net bar; the promoter pays any shortfall`);
-  if (d.barMode === 'split') out.push(`Bar split to the promoter: ${(d.barTiers || []).map((t: any) => `${t.bps / 100}% from ${money(t.fromCents)}`).join(', ')}`);
+  if (d.barMode === 'split') out.push(`Bar split to the promoter, ${d.barTierMethod === "whole" ? "highest rate reached on all net bar" : "each rate on its band"}: ${(d.barTiers || []).map((t: any) => `${t.bps / 100}% from ${money(t.fromCents)}`).join(', ')}`);
   if (d.facilityFeeCents) out.push(`Facility fee ${money(d.facilityFeeCents)} per ticket`);
   if (d.ticketFeeShareBps) out.push(`${d.ticketFeeShareBps / 100}% of the seller's service fees`);
   for (const h of d.houseExpense_venueDeal || []) out.push(`${h.label}: ${h.basis === 'flat' ? money(h.amountCents) : `clocked ${label(h.role)} hours × ${h.rateCents ? money(h.rateCents) : 'shift rate'}`}`);
@@ -69,7 +69,7 @@ export async function VenueDealDetailPage({ params }: { params: Promise<{ eventI
       </> : null}
       {over && can.canManageSettlements ? <>
         <h2 className="text-sm font-medium">Bar at close</h2>
-        {e.barSales_event[0] ? <p className="text-sm text-muted-foreground">Recorded: gross {money(e.barSales_event[0].grossCents)}, net {money(e.barSales_event[0].netCents)}{e.barSales_event[0].report ? ` · report attached` : ''}</p> : null}
+        {e.barSales_event[0] ? <p className="text-sm text-muted-foreground">Recorded: gross {money(e.barSales_event[0].grossCents)}, net {money(e.barSales_event[0].netCents)}{e.barSales_event[0].report ? <> · <a className="underline" href={`/api/documents/${e.barSales_event[0].report.id}`}>{e.barSales_event[0].report.title}</a></> : ''}</p> : null}
         <BarSalesForm eventId={e.id} bar={e.barSales_event[0]} frozen={frozen} />
         {live && ['accepted', 'settled'].includes(live.status) && live.dealType !== 'in_house' && !frozen ? <>
           <h2 className="text-sm font-medium">Promoter statement</h2>

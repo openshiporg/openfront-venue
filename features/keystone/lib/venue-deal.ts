@@ -10,6 +10,8 @@ export const RENT_MODES = ['flat', 'versus', 'plus'] as const;
 export const RENT_BASES = ['gross', 'net_of_tax_and_fees'] as const;
 export const CO_PRO_MODES = ['upside', 'up_and_down'] as const;
 export const BAR_MODES = ['none', 'guarantee', 'split'] as const;
+/** bracket: each rate on its own band of net bar. whole: the rate of the highest threshold reached, on all net bar (Santos, S9). */
+export const BAR_TIER_METHODS = ['bracket', 'whole'] as const;
 export const ISSUERS = ['own', 'openfront_concerts', 'openfront_comedy_club', 'other'] as const;
 export const HOUSE_CATEGORIES = ['security', 'stagehands', 'sound', 'lights', 'cleaning', 'insurance', 'box_office', 'other'] as const;
 export const STAFF_ROLES = ['security', 'crowd_manager', 'bartender', 'barback', 'box_office', 'door', 'sound', 'lights', 'stagehand', 'manager', 'server', 'cleaner'] as const;
@@ -20,7 +22,7 @@ export type DealTerms = {
   dealType: typeof DEAL_TYPES[number]; version: number; issuer: string;
   rentMode: typeof RENT_MODES[number]; rentCents: number; rentPercentBps: number; rentBase: string; rentBaseKind: typeof RENT_BASES[number];
   coProMode: typeof CO_PRO_MODES[number]; venueShareBps: number; contributedRevenues: string[];
-  barMode: typeof BAR_MODES[number]; barGuaranteeCents: number; barTiers: BarTier[];
+  barMode: typeof BAR_MODES[number]; barGuaranteeCents: number; barTiers: BarTier[]; barTierMethod: typeof BAR_TIER_METHODS[number];
   facilityFeeCents: number; ticketFeeShareBps: number;
   depositCents: number; depositDueAt: string | null; balanceDueAt: string | null;
   insuranceRequired: boolean; requiredLimitCents: number;
@@ -84,7 +86,7 @@ export function validateDealTerms(data: any, version = 1): DealTerms {
     dealType, version, issuer,
     rentMode, rentCents, rentPercentBps, rentBase, rentBaseKind,
     coProMode, venueShareBps, contributedRevenues: contributed,
-    barMode, barGuaranteeCents: barMode === 'guarantee' ? money(data?.barGuaranteeCents, 'Bar guarantee') : 0, barTiers: barMode === 'split' ? barTiers : [],
+    barMode, barGuaranteeCents: barMode === 'guarantee' ? money(data?.barGuaranteeCents, 'Bar guarantee') : 0, barTiers: barMode === 'split' ? barTiers : [], barTierMethod: barMode === 'split' ? oneOf(BAR_TIER_METHODS, data?.barTierMethod, 'bracket', 'bar tier method') : 'bracket',
     facilityFeeCents: money(data?.facilityFeeCents, 'Facility fee'), ticketFeeShareBps: bps(data?.ticketFeeShareBps, 'Ticket fee share'),
     depositCents: money(data?.depositCents, 'Deposit'), depositDueAt: when(data?.depositDueAt, 'Deposit due'), balanceDueAt: when(data?.balanceDueAt, 'Balance due'),
     insuranceRequired: data?.insuranceRequired === undefined ? true : Boolean(data.insuranceRequired), requiredLimitCents: money(data?.requiredLimitCents ?? 100000000, 'Required insurance limit'),
@@ -115,9 +117,16 @@ export function barShortfall(guaranteeCents: number, netBarCents: number) {
  * Bar split (D6): tiered percentages of NET bar sales paid to the promoter. Each tier's rate applies to the part of net sales
  * from its threshold up to the next tier's threshold (like tax brackets), so crossing a threshold never lowers the payout.
  */
-export function barCommission(tiers: BarTier[], netBarCents: number) {
+export function barCommission(tiers: BarTier[], netBarCents: number, method: DealTerms['barTierMethod'] = 'bracket') {
   const net = Math.max(0, netBarCents);
   const sorted = [...tiers].sort((a, b) => a.fromCents - b.fromCents);
+  if (method === 'whole') {
+    // The highest threshold reached sets one rate for all net bar; crossing a threshold can raise the payout in a step.
+    const reached = [...sorted].reverse().find(t => net >= t.fromCents && net > 0);
+    if (!reached) return { cents: 0, remainder: 0, rule: `Net bar ${usd(net)} is under the first tier` };
+    const p = percentage(net, reached.bps);
+    return { cents: p.cents, remainder: p.remainder, rule: `${pct(reached.bps)} of all net bar ${usd(net)} (reached the ${usd(reached.fromCents)} tier)` };
+  }
   let cents = 0, remainder = 0;
   const parts: string[] = [];
   sorted.forEach((tier, i) => {
@@ -215,7 +224,7 @@ export function promoterStatement(terms: DealTerms, a: StatementActuals) {
     const short = barShortfall(terms.barGuaranteeCents, a.netBarCents);
     push('bar_guarantee_shortfall', 'Bar guarantee shortfall', short, short ? `Guarantee ${usd(terms.barGuaranteeCents)} less net bar ${usd(a.netBarCents)}` : `Net bar ${usd(a.netBarCents)} met the ${usd(terms.barGuaranteeCents)} guarantee`);
   } else if (terms.barMode === 'split') {
-    const c = barCommission(terms.barTiers, a.netBarCents);
+    const c = barCommission(terms.barTiers, a.netBarCents, terms.barTierMethod || 'bracket');
     push('bar_commission', 'Bar commission to the promoter', -c.cents, c.rule, c.remainder);
   }
 

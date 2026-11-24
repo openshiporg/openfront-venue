@@ -31,7 +31,7 @@ export function VenueDealEditor({ eventId, deal, promoters, onSaved }: { eventId
     promoterId: d.promoter?.id || '', dealType: d.dealType || 'rental', issuer: d.issuer || 'own',
     rentMode: d.rentMode || 'flat', rent: dollars(d.rentCents), rentPct: pct(d.rentPercentBps), rentBaseKind: d.rentBaseKind || 'net_of_tax_and_fees', rentBase: d.rentBase || '',
     coProMode: d.coProMode || 'upside', venueShare: pct(d.venueShareBps), barIn: Array.isArray(d.contributedRevenues) ? d.contributedRevenues.includes('bar') : false,
-    barMode: d.barMode || 'none', barGuarantee: dollars(d.barGuaranteeCents),
+    barMode: d.barMode || 'none', barTierMethod: d.barTierMethod || 'bracket', barGuarantee: dollars(d.barGuaranteeCents),
     facilityFee: dollars(d.facilityFeeCents), feeShare: pct(d.ticketFeeShareBps), deposit: dollars(d.depositCents),
     depositDueAt: d.depositDueAt ? String(d.depositDueAt).slice(0, 10) : '', balanceDueAt: d.balanceDueAt ? String(d.balanceDueAt).slice(0, 10) : '',
     insuranceRequired: d.insuranceRequired ?? true, limit: d.requiredLimitCents ? String(d.requiredLimitCents / 100) : '1000000', notes: d.notes || '', reason: '',
@@ -49,7 +49,7 @@ export function VenueDealEditor({ eventId, deal, promoters, onSaved }: { eventId
       const data = {
         dealType: f.dealType, issuer: f.issuer, rentMode: f.rentMode, rentCents: toCents(f.rent), rentPercentBps: toBps(f.rentPct), rentBaseKind: f.rentBaseKind, rentBase: f.rentBase,
         coProMode: f.coProMode, venueShareBps: toBps(f.venueShare), contributedRevenues: f.barIn ? ['tickets', 'bar'] : ['tickets'],
-        barMode: f.barMode, barGuaranteeCents: toCents(f.barGuarantee), barTiers: tiers.map(t => ({ fromCents: toCents(t.from), bps: toBps(t.pct) })),
+        barMode: f.barMode, barTierMethod: f.barTierMethod, barGuaranteeCents: toCents(f.barGuarantee), barTiers: tiers.map(t => ({ fromCents: toCents(t.from), bps: toBps(t.pct) })),
         facilityFeeCents: toCents(f.facilityFee), ticketFeeShareBps: toBps(f.feeShare), depositCents: toCents(f.deposit),
         depositDueAt: f.depositDueAt || null, balanceDueAt: f.balanceDueAt || null, insuranceRequired: f.insuranceRequired, requiredLimitCents: toCents(f.limit), notes: f.notes,
         houseExpenses: house.map(h => h.basis === 'flat' ? { label: h.label, category: h.category, basis: 'flat', amountCents: toCents(h.amount) } : { label: h.label, category: h.category, basis: 'from_shifts', role: h.role, rateCents: h.rate.trim() ? toCents(h.rate) : undefined }),
@@ -92,7 +92,13 @@ export function VenueDealEditor({ eventId, deal, promoters, onSaved }: { eventId
           </div>
           {f.barMode === 'split' ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium">Bar split tiers (each rate applies to net bar from its threshold to the next)</p>
+              <Field label="How tiers pay" hint="The two give different payouts; the promoter sees the method in the terms">
+                <select className={sel} value={f.barTierMethod} onChange={set('barTierMethod')}>
+                  <option value="bracket">Bracket: each rate on its own band of net bar</option>
+                  <option value="whole">Whole: the highest rate reached, on all net bar</option>
+                </select>
+              </Field>
+              <p className="text-sm font-medium">Bar split tiers</p>
               {tiers.map((t, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-2 text-sm">
                   From $<Input className="w-28" inputMode="decimal" value={t.from} onChange={e => setTiers(tiers.map((x, j) => j === i ? { ...x, from: e.target.value } : x))} aria-label="Tier from" />

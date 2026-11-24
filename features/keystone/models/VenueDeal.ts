@@ -2,7 +2,7 @@ import { list } from '@keystone-6/core';
 import { text, integer, checkbox, json, select, relationship, timestamp } from '@keystone-6/core/fields';
 import { trackingFields } from './trackingFields';
 import { readAccess } from '../access';
-import { DEAL_TYPES, RENT_MODES, RENT_BASES, CO_PRO_MODES, BAR_MODES, ISSUERS } from '../lib/venue-deal';
+import { DEAL_TYPES, RENT_MODES, RENT_BASES, CO_PRO_MODES, BAR_MODES, BAR_TIER_METHODS, ISSUERS } from '../lib/venue-deal';
 
 const opts = (l: readonly string[]) => l.map(v => ({ label: v.replace(/_/g, ' '), value: v }));
 const locked = { create: () => false, update: () => false };
@@ -31,6 +31,7 @@ export const VenueDeal = list({
     barMode: select({ type: 'string', options: opts(BAR_MODES), defaultValue: 'none', access: locked }),
     barGuaranteeCents: integer({ defaultValue: 0, access: locked }),
     barTiers: json({ access: locked }),
+    barTierMethod: select({ type: 'string', options: opts(BAR_TIER_METHODS), defaultValue: 'bracket', access: locked }),
     facilityFeeCents: integer({ defaultValue: 0, access: locked }),
     ticketFeeShareBps: integer({ defaultValue: 0, access: locked }),
     depositCents: integer({ defaultValue: 0, access: locked }),

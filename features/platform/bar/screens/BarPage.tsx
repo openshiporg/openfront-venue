@@ -23,7 +23,7 @@ export async function BarPage() {
               <span className="font-medium">{e.title}</span>
               <span className="text-sm text-muted-foreground">{[when(e.showAt, e.room?.timezone || undefined), e.room?.name].filter(Boolean).join(' · ')}</span>
             </div>
-            {bar ? <p className="text-sm text-muted-foreground">Net {money(bar.netCents)}{deal?.barMode === 'guarantee' ? ` against a ${money(deal.barGuaranteeCents)} guarantee${bar.netCents < deal.barGuaranteeCents ? `: shortfall ${money(deal.barGuaranteeCents - bar.netCents)}` : ': met'}` : ''}{bar.report ? ' · report attached' : ' · no report attached'}</p> : <p className="text-sm text-muted-foreground">Not recorded yet.</p>}
+            {bar ? <p className="text-sm text-muted-foreground">Net {money(bar.netCents)}{deal?.barMode === 'guarantee' ? ` against a ${money(deal.barGuaranteeCents)} guarantee${bar.netCents < deal.barGuaranteeCents ? `: shortfall ${money(deal.barGuaranteeCents - bar.netCents)}` : ': met'}` : ''}{bar.report ? <> · <a className="underline" href={`/api/documents/${bar.report.id}`}>{bar.report.title}</a></> : ' · no report attached'}</p> : <p className="text-sm text-muted-foreground">Not recorded yet.</p>}
             <BarSalesForm eventId={e.id} bar={bar} frozen={e.settlement_event.length > 0} />
           </section>
         );
