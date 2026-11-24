@@ -42,7 +42,7 @@ suite('a challenge sets a deadline; confirming below a live hold is refused unti
   await assert.rejects(run('challengeHold', { holdId: second.id, byHoldId: first.id }), /lower-ranked/);
   const challenged = await run('challengeHold', { holdId: first.id, byHoldId: second.id });
   assert.equal(challenged.status, 'challenged');
-  assert.ok(new Date(challenged.challengeDeadline) > new Date());
+  assert.ok(new Date(String(challenged.challengeDeadline)) > new Date());
   await assert.rejects(run('confirmHold', { holdId: second.id, title: 'Late Show', seatingChartId: chart.id, doorsTime: '19:00', showTime: '20:00' }), /Earlier ranked hold must be released/);
   // Time passes: the deadline is now behind us. The next request that touches the day releases rank 1 with the reason.
   await prisma.dateHold.update({ where: { id: first.id }, data: { challengeDeadline: new Date(Date.now() - 60000) } });
