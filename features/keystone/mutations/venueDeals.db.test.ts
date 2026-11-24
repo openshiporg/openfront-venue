@@ -10,6 +10,9 @@ import { checkedClient } from '../lib/transaction';
 import { canonicalDigest, createProof, digest, ticketToken } from '../lib/guest-proof';
 import { transferTicket } from './checkout';
 import { storeDocument, readDocument } from '../lib/documents';
+import { issueDoorSale, issueComp } from './doorSales';
+import { createHold } from './inventory';
+import { verifyProof } from '../lib/guest-proof';
 
 /**
  * Venue deals, bar totals, promoter payments and the promoter settlement, run as the real resolvers against a migrated
@@ -124,7 +127,7 @@ suite('promoter settlement: lines sum to the balance, a signed statement is froz
   assert.ok((view.settlement?.lines.length || 0) > 0);
 });
 
-suite('no link secret is written to the idempotency table: a deal link and a transferred ticket keep only a nonce or a code', async () => {
+suite('no link or ticket secret is written to the idempotency table: deal link, transfer, door sale, comp and hold proof', async () => {
   const { eventId } = await bookedRental(ahead(75));
   const draft = await m('saveVenueDeal', { eventId, data: { dealType: 'rental', rentMode: 'flat', rentCents: 200000 } });
   const sendKey = key();
@@ -148,6 +151,28 @@ suite('no link secret is written to the idempotency table: a deal link and a tra
   assert.equal(fresh?.tokenHash, digest(moved.token));
   const row = await prisma.idempotencyKey.findUnique({ where: { idempotencyKey: moveKey } });
   assert.ok(row && !JSON.stringify(row).includes(moved.token), 'the new ticket token is not in IdempotencyKey');
+  // Door sale, comp and online hold: the reply carries the QR tokens and the hold proof; the stored reply carries none.
+  const box: any = ctxFor((await prisma.user.create({ data: { name: 'Box office', email: `box-${Date.now()}@example.com`, password: 'x' } })).id);
+  box.session.data.role = { ...ALL, canManageOrders: true };
+  const room = (await prisma.event.findUnique({ where: { id: eventId }, select: { roomId: true } }))!.roomId!;
+  await prisma.room.update({ where: { id: room }, data: { capacity: 500 } });
+  const section = await prisma.chartSection.create({ data: { name: 'Floor', kind: 'ga', capacity: 300, chart: { connect: { id: (await prisma.event.findUnique({ where: { id: eventId } }))!.seatingChartId! } } } });
+  const level = await prisma.priceLevel.create({ data: { eventId, name: 'GA', priceCents: 3000, feeCents: 0, facilityFeeCents: 0, capacity: 300, status: 'active', perOrderLimit: 8, sections: { connect: [{ id: section.id }] } } as any });
+  await prisma.event.update({ where: { id: eventId }, data: { status: 'on_sale' } });
+  for (const [issueFn, extra] of [[issueDoorSale, { tender: { kind: 'card_external', reference: 'TERM-4471' } }], [issueComp, { reason: 'Artist guest' }]] as const) {
+    const k = key();
+    const r: any = await (issueFn as any)(null, { input: { idempotencyKey: k, eventId, levelId: level.id, qty: 2, name: 'Walk Up', ...extra } }, box);
+    assert.equal(r.tickets.length, 2);
+    for (const t of r.tickets) assert.equal(t.token, ticketToken(t.ticketCode));
+    const stored = JSON.stringify(await prisma.idempotencyKey.findUnique({ where: { idempotencyKey: k } }));
+    assert.ok(r.tickets.every((t: any) => stored.includes(t.ticketCode) && !stored.includes(t.token)), 'codes kept, QR tokens not stored');
+    const again: any = await (issueFn as any)(null, { input: { idempotencyKey: k, eventId, levelId: level.id, qty: 2, name: 'Walk Up', ...extra } }, box);
+    assert.deepEqual(again.tickets.map((t: any) => t.token), r.tickets.map((t: any) => t.token), 'a replay rebuilds the same tokens');
+  }
+  const holdKey = key();
+  const hold: any = await createHold(null, { idempotencyKey: holdKey, eventId, levelId: level.id, qty: 1 }, guest);
+  assert.ok(verifyProof(hold.proof, hold.id));
+  assert.ok(!JSON.stringify(await prisma.idempotencyKey.findUnique({ where: { idempotencyKey: holdKey } })).includes(hold.proof), 'the hold proof is not stored');
 });
 
 suite('documents are stored in the database: a POS report uploads and reads back with no storage service set up', async () => {
