@@ -1,6 +1,6 @@
 import { digest, opaqueToken } from './guest-proof';
 import { appendAuditEvent } from './audit';
-import { putSecret, getSecret, dropSecret } from './secret-box';
+import { putSecret, getSecret, dropSecret, SecretUnreadable } from './secret-box';
 import { lockTransactionKey, checkedClient } from './transaction';
 import { type UrlPolicy, AddressRefused, SiblingUnreachable } from './sibling-http';
 import {
@@ -54,7 +54,7 @@ export async function completeConnection(prisma: any, policy: UrlPolicy, args: {
     throw new CallbackRefused(args.error === 'access_denied' ? 'The connection was not approved at the seller.' : `The seller refused: ${text(args.errorDescription || args.error)}`);
   }
   if (!args.code) throw new CallbackRefused('The seller sent no authorization code. Start the connection again.');
-  const verifier = await getSecret(prisma, verifierSecretName(row.id));
+  const verifier = await getSecret(prisma, verifierSecretName(row.id)).catch(e => { if (e instanceof SecretUnreadable) return null; throw e; });
   if (!verifier) throw new CallbackRefused('This connection link is no longer valid. Start the connection again.');
   // One use only: clear the state before spending the code.
   const claimed = await prisma.channelConnection.updateMany({ where: { id: row.id, status: 'pending', stateHash: row.stateHash }, data: { stateHash: '' } });

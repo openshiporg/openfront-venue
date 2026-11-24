@@ -111,7 +111,11 @@ export async function scanAtDoor(context: any, input: any, policy: UrlPolicy) {
     const done = await scanLocal(tx, s, actor);
     if (done) return done;
     const event = await tx.event.findUnique({ where: { id: s.eventId }, include: { connection: true } });
-    if (CONNECTED.includes(event.issuer) && event.connection && event.externalEventId) return { pendingSibling: true };
+    if (CONNECTED.includes(event.issuer) && event.connection && event.externalEventId) {
+      // The venue's own door state first, as on the local path: no seller is asked while our doors are shut.
+      if (!SCAN_OPEN.includes(event.status)) throw new Error('Doors are not open');
+      return { pendingSibling: true };
+    }
     return record(tx, { eventId: s.eventId, gate: s.gate, scannedById: actor, source: 'own', result: 'not_found', codeLast4: last4(s.code), message: event.issuer === 'other' ? 'Not in the imported barcodes' : 'No ticket has that code' });
   });
   if (!local?.pendingSibling) return local;
@@ -126,7 +130,7 @@ export async function scanAtDoor(context: any, input: any, policy: UrlPolicy) {
     const result = answer.raw ? siblingScanResult(event.connection.kind, answer.raw) : /ticket not found/i.test(answer.message) ? 'not_found' : 'issuer_refused';
     outcome = { result, issuerResult: text(answer.raw || '', 40), message: text(answer.message) };
   } catch (e: any) {
-    const why = e instanceof NeedsReconnect ? 'The connection to the seller must be reconnected; do not admit on this scan' : e instanceof SiblingUnreachable || e instanceof AddressRefused ? 'Seller not answering; do not admit on this scan' : 'Seller not answering; do not admit on this scan';
+    const why = e instanceof NeedsReconnect ? `Reconnect the seller under Connections; do not admit on this scan (${text(e.message, 160)})` : e instanceof SiblingUnreachable || e instanceof AddressRefused ? 'Seller not answering; do not admit on this scan' : 'Seller not answering; do not admit on this scan';
     outcome = { result: 'issuer_unreachable', issuerResult: '', message: why };
   }
   return command(context, { operation: 'scanTicket:sibling', idempotencyKey: `${idempotencyKey}:sibling`, lock: `event:${s.eventId}`, params }, tx =>
@@ -352,35 +356,74 @@ export async function setEventIssuer(_: any, { input }: any, context: any, polic
     if (!listed) throw new Error('That event is not listed at the seller');
     data = { ...data, connectionId: connection.id, externalEventId, externalEventTitle: listed.title, externalUrl: listed.url, externalSellerName: connection.siblingName || CHANNEL_LABEL[issuer as keyof typeof CHANNEL_LABEL], connectedSold: listed.sold ?? 0, connectedSoldAt: listed.sold == null ? null : new Date() };
   }
+  // Leaving a connected seller (to own, other, another connection or another of its events) would strand every ticket it
+  // sold: the door asks only the current seller. Allowed only when the seller confirms, live, that it sold none.
+  const current = await context.prisma.event.findUnique({ where: { id: String(input.eventId || '') }, include: { connection: true } });
+  if (!current) throw new Error('Event not found');
+  const leaving = (e: any) => CONNECTED.includes(e.issuer) && !!e.externalEventId && (e.issuer !== data.issuer || e.connectionId !== data.connectionId || e.externalEventId !== data.externalEventId);
+  if (leaving(current)) {
+    const seller = current.externalSellerName || CHANNEL_LABEL[current.issuer as keyof typeof CHANNEL_LABEL];
+    let sold: number;
+    try {
+      if (!current.connection) throw new NeedsReconnect('The connection was removed');
+      sold = await siblingSold(context.prisma, policy, current.connection, current.externalEventId);
+    } catch (e: any) {
+      throw new Error(`Cannot confirm ${seller} has sold nothing for this night (${text(e?.message, 160)}). Their tickets would stop scanning here, so the seller stays until they answer.`);
+    }
+    if (sold > 0) throw new Error(`${seller} has sold ${sold} ticket${sold === 1 ? '' : 's'} for this night. Their holders scan through that seller, so it cannot change until those tickets are refunded there.`);
+  }
   return command(context, { operation: 'setEventIssuer', idempotencyKey, lock: `event:${input.eventId}`, params: { eventId: input.eventId, issuer, connectionId: input.connectionId || null, externalEventId: input.externalEventId || null, sellerName: input.sellerName || null, url: input.url || null } }, async tx => {
     const event = await tx.event.findUnique({ where: { id: input.eventId } });
     if (!event) throw new Error('Event not found');
     if (['completed', 'settling', 'settled', 'cancelled'].includes(event.status)) throw new Error('The seller cannot change after the show');
+    // The seller check above read this state; if it changed meanwhile, start again rather than act on a stale answer.
+    if (leaving(event) && (event.issuer !== current.issuer || event.connectionId !== current.connectionId || event.externalEventId !== current.externalEventId)) throw new Error('This night’s seller changed meanwhile; reload and try again');
     if (issuer !== 'own' && event.issuer === 'own') {
       const sold = await tx.ticket.count({ where: { eventId: event.id, status: { in: ['valid', 'checked_in'] }, order: { status: { not: 'comp' } } } });
       if (sold) throw new Error(`The box office has already sold ${sold} ticket${sold === 1 ? '' : 's'} for this event; refund them before handing it to another seller`);
       if (await tx.inventoryHold.count({ where: { eventId: event.id, status: 'active' } })) throw new Error('Customers are checking out for this event right now; try again in a few minutes');
     }
     await tx.event.update({ where: { id: event.id }, data });
+    forgetConnectedAvailability(event.id);
     await appendAuditEvent(tx, actor, { action: 'event.issuer_set', targetList: 'Event', targetId: event.id, before: { issuer: event.issuer, externalEventId: event.externalEventId }, after: { issuer, externalEventId: data.externalEventId, sellerName: data.externalSellerName } });
     return { id: event.id, issuer, externalSellerName: data.externalSellerName, externalUrl: data.externalUrl, externalEventTitle: data.externalEventTitle };
   });
 }
 
 /** W2.2, public: the connected seller's live all-in prices and sold-out state, read on request. Never who bought. */
+/** Public reads answer from a short per-event memory for 30 s so a slow seller cannot hold every event-page view. Nothing
+ * refreshes it on a timer: an entry is only ever replaced by the next request after it is stale (in-process, per instance). */
+export const PUBLIC_SELLER_TIMEOUT_MS = 3_000;
+const AVAILABILITY_TTL_MS = 30_000;
+const availabilityMemo = new Map<string, { at: number; key: string; value: any }>();
+export function forgetConnectedAvailability(eventId?: string) { if (eventId) availabilityMemo.delete(eventId); else availabilityMemo.clear(); }
+
 export async function connectedAvailability(_: any, args: { eventId: string }, context: any, policy: UrlPolicy = publicHostPolicy) {
   const event = await context.prisma.event.findUnique({ where: { id: args.eventId }, include: { connection: { select: { kind: true, issuer: true, status: true } } } });
   if (!event || !['announced', 'presale', 'on_sale', 'sold_out', 'postponed'].includes(event.status)) throw new Error('Event unavailable');
   const base = { eventId: event.id, issuer: event.issuer, sellerName: event.externalSellerName || null, url: event.externalUrl || null };
   if (!CONNECTED.includes(event.issuer) || !event.connection || !event.externalEventId) return { ...base, live: false, levels: [], soldOut: null };
+  const memoKey = `${event.connectionId}:${event.externalEventId}`;
+  const hit = availabilityMemo.get(event.id);
+  if (hit && hit.key === memoKey && Date.now() - hit.at < AVAILABILITY_TTL_MS) return hit.value;
+  const value = await readSellerAvailability(event, base, policy);
+  if (availabilityMemo.size > 2000) availabilityMemo.clear();
+  availabilityMemo.set(event.id, { at: Date.now(), key: memoKey, value });
+  return value;
+}
+
+/** Comedy tier states that a buyer may see: on sale, or sold out. Paused and closed tiers are not offered. */
+const COMEDY_VISIBLE_TIERS = ['on_sale', 'sold_out'];
+
+async function readSellerAvailability(event: any, base: any, policy: UrlPolicy) {
   try {
     if (event.connection.kind === 'openfront_concerts') {
-      const r = await siblingPublicGraphQL(policy, event.connection.issuer, 'query($id: ID!) { a: eventAvailability(eventId: $id) }', { id: event.externalEventId });
+      const r = await siblingPublicGraphQL(policy, event.connection.issuer, 'query($id: ID!) { a: eventAvailability(eventId: $id) }', { id: event.externalEventId }, PUBLIC_SELLER_TIMEOUT_MS);
       const levels = (r.data?.a?.levels || []).map((l: any) => ({ name: text(l.name, 80), allInCents: (l.priceCents || 0) + (l.feeCents || 0) + (l.facilityFeeCents || 0), currencyCode: text(l.currencyCode || 'USD', 3), soldOut: (l.capacity || 0) - (l.sold || 0) - (l.held || 0) - (l.productionHeld || 0) <= 0 }));
       return { ...base, live: true, status: text(r.data?.a?.event?.status, 30), levels, soldOut: levels.length ? levels.every((l: any) => l.soldOut) : null };
     }
-    const r = await siblingPublicGraphQL(policy, event.connection.issuer, 'query($id: ID!) { a: showAvailability(showId: $id) }', { id: event.externalEventId });
-    const levels = (r.data?.a?.tiers || []).filter((t: any) => t.status !== 'hidden').map((t: any) => ({ name: text(t.name, 80), allInCents: (t.priceCents || 0) + (t.feeCents || 0), currencyCode: 'USD', soldOut: (t.capacity || 0) - (t.sold || 0) - (t.held || 0) <= 0 }));
+    const r = await siblingPublicGraphQL(policy, event.connection.issuer, 'query($id: ID!) { a: showAvailability(showId: $id) }', { id: event.externalEventId }, PUBLIC_SELLER_TIMEOUT_MS);
+    const levels = (r.data?.a?.tiers || []).filter((t: any) => COMEDY_VISIBLE_TIERS.includes(t.status)).map((t: any) => ({ name: text(t.name, 80), allInCents: (t.priceCents || 0) + (t.feeCents || 0), currencyCode: 'USD', soldOut: t.status === 'sold_out' || (t.capacity || 0) - (t.sold || 0) - (t.held || 0) <= 0 }));
     return { ...base, live: true, status: text(r.data?.a?.status, 30), levels, soldOut: levels.length ? levels.every((l: any) => l.soldOut) : r.data?.a?.status === 'sold_out' };
   } catch {
     return { ...base, live: false, levels: [], soldOut: null, message: 'Prices are on the seller’s page' };

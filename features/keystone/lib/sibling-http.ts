@@ -88,7 +88,8 @@ const FIXED_PATHS = ['/.well-known/oauth-authorization-server', '/oauth/register
 
 export type SiblingResponse = { status: number; json: any; text: string };
 
-export async function siblingRequest(policy: UrlPolicy, base: string, path: string, init: { method?: 'GET' | 'POST'; headers?: Record<string, string>; body?: string } = {}): Promise<SiblingResponse> {
+export async function siblingRequest(policy: UrlPolicy, base: string, path: string, init: { method?: 'GET' | 'POST'; headers?: Record<string, string>; body?: string; timeoutMs?: number } = {}): Promise<SiblingResponse> {
+  const timeoutMs = Math.min(SIBLING_TIMEOUT_MS, Math.max(500, init.timeoutMs ?? SIBLING_TIMEOUT_MS));
   if (!FIXED_PATHS.includes(path)) throw new Error(`Refusing to call ${path} on a sibling`);
   const origin = baseUrlOf(base, policy);
   const url = new URL(path, origin);
@@ -103,8 +104,8 @@ export async function siblingRequest(policy: UrlPolicy, base: string, path: stri
   };
   return new Promise<SiblingResponse>((resolve, reject) => {
     const req = lib.request(url, {
-      method: init.method || 'GET', lookup, timeout: SIBLING_TIMEOUT_MS, signal: AbortSignal.timeout(SIBLING_TIMEOUT_MS),
-      headers: { accept: 'application/json', 'user-agent': 'Openfront Venue', ...(init.body ? { 'content-length': Buffer.byteLength(init.body).toString() } : {}), ...init.headers },
+      method: init.method || 'GET', lookup, timeout: timeoutMs, signal: AbortSignal.timeout(timeoutMs),
+      headers: { accept: 'application/json', 'user-agent': 'Openfront Venue', ...(init.body ? { 'content-length': Buffer.byteLength(init.body).toString() } : {}), ...(init.headers || {}) },
     }, res => {
       const chunks: Buffer[] = []; let size = 0;
       res.on('data', (c: Buffer) => { size += c.length; if (size > MAX_BODY) { req.destroy(new SiblingUnreachable('The seller’s system sent too much data')); return; } chunks.push(c); });
@@ -116,7 +117,7 @@ export async function siblingRequest(policy: UrlPolicy, base: string, path: stri
       res.on('error', () => reject(new SiblingUnreachable()));
     });
     // The abort signal is a hard deadline for the whole exchange; `timeout` also catches an idle socket.
-    req.on('timeout', () => req.destroy(new SiblingUnreachable('The seller’s system did not answer within 10 seconds')));
+    req.on('timeout', () => req.destroy(new SiblingUnreachable(`The seller’s system did not answer within ${Math.round(timeoutMs / 1000)} seconds`)));
     req.on('error', (e: any) => { reject(e instanceof AddressRefused || e instanceof SiblingUnreachable ? e : new SiblingUnreachable()); });
     if (init.body) req.write(init.body);
     req.end();

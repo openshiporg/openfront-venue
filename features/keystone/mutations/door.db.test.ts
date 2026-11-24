@@ -6,9 +6,10 @@ import { runHoldCommand } from './calendar';
 import { checkedClient } from '../lib/transaction';
 import { issueDoorSale, issueComp } from './doorSales';
 import { transferTicket } from './checkout';
-import { scanAtDoor, admitWillCall, addGuestListEntry, admitGuestListEntry, removeGuestListEntry, importExternalTickets, voidExternalTicket, doorSearch, eventIssued } from './door';
+import { createServer } from 'node:net';
+import { scanAtDoor, admitWillCall, addGuestListEntry, admitGuestListEntry, removeGuestListEntry, importExternalTickets, voidExternalTicket, doorSearch, eventIssued, setEventIssuer } from './door';
 import { createProof, ticketToken } from '../lib/guest-proof';
-import { publicHostPolicy, AddressRefused } from '../lib/sibling-http';
+import { publicHostPolicy, loopbackPolicy, AddressRefused } from '../lib/sibling-http';
 import { putSecret, getSecret, secretKey, SecretUnreadable } from '../lib/secret-box';
 import { refreshSecretName } from '../lib/channel-client';
 import { startConnection } from '../lib/channel-connect';
@@ -149,6 +150,22 @@ suite('13. connected issuer failure: an unreachable host gives issuer_unreachabl
   assert.equal(await prisma.channelConnection.count({ where: { baseUrl: { in: ['https://10.0.0.5', 'https://192.168.1.20'] } } }), 0, 'nothing stored for a refused address');
 });
 
+/** A loopback port that was just free: bind port 0, read it, close. Nothing listens there afterwards. */
+const deadPort = () => new Promise<number>((resolve, reject) => { const s = createServer(); s.once('error', reject); s.listen(0, '127.0.0.1', () => { const p = (s.address() as any).port; s.close(() => resolve(p)); }); });
+
+suite('13b. leaving a connected seller that is not answering is refused in words; nothing changes', async () => {
+  const a = await nightAtDoors();
+  const dead = `http://127.0.0.1:${await deadPort()}`;
+  const conn = await prisma.channelConnection.create({ data: { kind: 'openfront_concerts', baseUrl: dead, issuer: dead, clientId: 'mcp_cl_dead', status: 'connected', connectedAt: new Date() } });
+  await putSecret(prisma, refreshSecretName(conn.id), `mcp_rt_${randomBytes(24).toString('base64url')}`);
+  await prisma.event.update({ where: { id: a.eventId }, data: { issuer: 'openfront_concerts', connectionId: conn.id, externalEventId: 'evt_remote_2', externalSellerName: 'Lantern Live' } });
+  for (const to of [{ issuer: 'own' }, { issuer: 'other', sellerName: 'Dice' }])
+    await assert.rejects(setEventIssuer(null, { input: { idempotencyKey: key(), eventId: a.eventId, ...to } }, door, loopbackPolicy), /Cannot confirm Lantern Live has sold nothing/, to.issuer);
+  const after = await prisma.event.findUnique({ where: { id: a.eventId } });
+  assert.deepEqual([after!.issuer, after!.connectionId, after!.externalEventId], ['openfront_concerts', conn.id, 'evt_remote_2']);
+  assert.equal(await prisma.auditEvent.count({ where: { action: 'event.issuer_set', targetId: a.eventId } }), 0);
+});
+
 suite('14. SecretBox: a refresh token round-trips; the row never holds the plain token; a wrong key fails', async () => {
   const name = `channel:${randomUUID()}:refresh`;
   const token = `mcp_rt_${randomBytes(32).toString('base64url')}`;
@@ -161,6 +178,18 @@ suite('14. SecretBox: a refresh token round-trips; the row never holds the plain
   await putSecret(prisma, name, rotated);
   assert.equal(await getSecret(prisma, name), rotated);
   assert.ok((await prisma.secretBox.findUnique({ where: { key: name } }))!.rotatedAt);
+  // A connection whose sealed refresh token this deployment cannot open (secret rotated) is not "seller not answering":
+  // the scan says reconnect, admits nobody, and the connection is marked needs_reconnect.
+  const a = await nightAtDoors();
+  const dead = `http://127.0.0.1:${await deadPort()}`;
+  const conn = await prisma.channelConnection.create({ data: { kind: 'openfront_concerts', baseUrl: dead, issuer: dead, clientId: 'mcp_cl_rot', status: 'connected', connectedAt: new Date() } });
+  await putSecret(prisma, refreshSecretName(conn.id), `mcp_rt_${randomBytes(24).toString('base64url')}`, secretKey({ SESSION_SECRET: randomBytes(32).toString('hex') }));
+  await prisma.event.update({ where: { id: a.eventId }, data: { issuer: 'openfront_concerts', connectionId: conn.id, externalEventId: 'evt_remote_3', externalSellerName: 'Lantern Live' } });
+  const r: any = await scanAtDoor(door, { idempotencyKey: key(), eventId: a.eventId, code: 'TK-ROTATED01', gate: 'Main' }, loopbackPolicy);
+  assert.equal(r.result, 'issuer_unreachable'); assert.match(r.message, /Reconnect/); assert.doesNotMatch(r.message, /not answering/);
+  const marked = await prisma.channelConnection.findUnique({ where: { id: conn.id } });
+  assert.equal(marked!.status, 'needs_reconnect'); assert.match(String(marked!.lastError), /Reconnect it/);
+  assert.equal(await prisma.scanEvent.count({ where: { eventId: a.eventId, result: 'admitted' } }), 0);
 });
 
 suite('15. total issued: own sold + comps + imported + guest list (+ connected sold) against the configuration; warns exactly when over', async () => {

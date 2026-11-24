@@ -118,6 +118,13 @@ suite('12. a ticket issued by a real Openfront Concerts scans at the venue throu
   assert.equal(issued.fresh, true); assert.ok(issued.connectedSold >= 1, 'sold count read live from Concerts');
   const check: any = await checkConnection(prisma, loopbackPolicy, connected.id);
   assert.equal(check.ok, true, check.message);
+  // Concerts has sold for this night: leaving it (to own, to another seller, or to another Concerts event) would strand
+  // those holders at the door, so it is refused and nothing changes.
+  const otherRemote = await seed('event', { key: 'e2', title: `${title} (late show)`, venue: 'Openfront Venue Room', chart: 'GA', status: 'on_sale', showDays: 3, artist: 'Harbor Lights', deal: { dealType: 'flat_guarantee', guaranteeCents: 100000, percentageBps: 0, promoterProfitBps: 0, expenseCapCents: 0, depositCents: 0, merchSplitBps: 0, hardMerchSplitBps: 0, breakevenBasis: '', radiusClause: '', hospitalityRiderCents: 0 }, levels: [{ name: 'GA', priceCents: 3000, feeCents: 300, facilityFeeCents: 0, capacity: 300, sections: ['Floor'], phases: [] }], expenses: [] });
+  for (const to of [{ issuer: 'own' }, { issuer: 'other', sellerName: 'Dice' }, { issuer: 'openfront_concerts', connectionId: connected.id, externalEventId: otherRemote }])
+    await assert.rejects(setEventIssuer(null, { input: { idempotencyKey: randomUUID(), eventId, ...to } }, door, loopbackPolicy), /has sold \d+ tickets? for this night/, to.issuer);
+  const kept = (await prisma.event.findUnique({ where: { id: eventId } }))!;
+  assert.deepEqual([kept.issuer, kept.externalEventId], ['openfront_concerts', remoteId]);
 
   // A dead grant: Concerts answers invalid_grant, the connection becomes needs_reconnect, and the scan admits no one.
   const fresh = (await prisma.event.findUnique({ where: { id: eventId } }))!;

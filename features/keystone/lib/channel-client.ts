@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { siblingRequest, baseUrlOf, AddressRefused, SiblingUnreachable, type UrlPolicy } from './sibling-http';
-import { putSecret, getSecret, dropSecret } from './secret-box';
+import { putSecret, getSecret as readSecret, dropSecret, SecretUnreadable } from './secret-box';
 import { lockTransactionKey, checkedClient } from './transaction';
 
 /**
@@ -23,6 +23,12 @@ export const PENDING_MINUTES = 15;
 /** The sibling refused the grant (revoked, expired or reused refresh token): staff must reconnect. */
 export class NeedsReconnect extends Error {
   constructor(message = 'This connection must be reconnected') { super(message); }
+}
+
+export const UNREADABLE_SECRET = 'The stored sign-in for this connection can no longer be read here (the venue’s secret key changed). Reconnect it.';
+/** A sealed secret this deployment cannot open (SESSION_SECRET rotated or VENUE_SECRET_KEY wrong) ends the connection: reconnect, never wait. */
+async function getSecret(db: any, name: string) {
+  try { return await readSecret(db, name); } catch (e) { if (e instanceof SecretUnreadable) throw new NeedsReconnect(UNREADABLE_SECRET); throw e; }
 }
 
 const b64url = (b: Buffer) => b.toString('base64url');
@@ -152,8 +158,8 @@ export async function siblingGraphQL(prisma: any, connection: any, policy: UrlPo
 }
 
 /** Public GraphQL on the sibling (no token), for its public availability queries. */
-export async function siblingPublicGraphQL(policy: UrlPolicy, issuer: string, query: string, variables: Record<string, unknown> = {}): Promise<SiblingGraphQL> {
-  const res = await siblingRequest(policy, issuer, '/api/graphql', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query, variables }) });
+export async function siblingPublicGraphQL(policy: UrlPolicy, issuer: string, query: string, variables: Record<string, unknown> = {}, timeoutMs?: number): Promise<SiblingGraphQL> {
+  const res = await siblingRequest(policy, issuer, '/api/graphql', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ query, variables }), timeoutMs });
   if (res.status >= 500 || res.status === 0 || !res.json) throw new SiblingUnreachable();
   return { data: res.json.data ?? null, errors: Array.isArray(res.json.errors) ? res.json.errors.map((e: any) => ({ message: text(e?.message) })) : [] };
 }
