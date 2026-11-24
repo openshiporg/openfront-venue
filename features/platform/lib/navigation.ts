@@ -1,4 +1,4 @@
-import { Inbox, CalendarDays, Ticket, Handshake, Store, ScanLine, FileSpreadsheet, Building2, Mic2, ReceiptText, Tag, CreditCard, Users, Settings, LucideIcon } from 'lucide-react'
+import { Inbox, CalendarDays, Ticket, Handshake, Store, ScanLine, FileSpreadsheet, Building2, Mic2, ReceiptText, Tag, CreditCard, Users, Settings, Link2, LucideIcon } from 'lucide-react'
 
 export interface PlatformNavItem {
   title: string
@@ -37,6 +37,7 @@ export const platformNavItems: PlatformNavItem[] = [
   { title: 'Customers', href: '/platform/customers', color: 'slate', description: 'Customers, staff and roles.', icon: Users, group: 'sales', requires: ['canSeeOtherPeople', 'canManagePeople', 'canManageRoles'] },
 
   { title: 'Payment providers', href: '/platform/payment-providers', color: 'slate', description: 'Configure payment gateways.', icon: CreditCard, group: 'integrations', requires: ['canReadPayments', 'canManagePayments'] },
+  { title: 'Connections', href: '/platform/connections', color: 'indigo', description: 'Promoters’ and clubs’ Openfront systems that sell the venue’s nights.', icon: Link2, group: 'integrations', requires: ['canManageConnections'] },
   { title: 'Settings', href: '/platform/settings', color: 'slate', description: 'Venue settings and refund threshold.', icon: Settings, group: 'integrations' },
   { title: 'Store', href: '/platform/store', color: 'slate', description: 'Configure store settings, logo, and branding.', icon: Store, group: 'integrations', requires: ['canManageEvents'] },
 ]

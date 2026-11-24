@@ -5,6 +5,7 @@ import { roleFlags } from '../../lib/guard';
 import { grossReaders } from '@/features/keystone/access';
 import { money, when, label } from '../../lib/format';
 import { EventActions } from '../components/EventActions';
+import { IssuerPicker, ExternalImport, VoidExternal, GuestListEditor, RemoveGuest } from '../components/TicketSources';
 import { PriceLevelEditor, PhaseEditor, LevelStatusActions } from '../components/PricingEditors';
 import { ExpenseEditor, MerchEditor, DepositEditor } from '../components/SettlementInputs';
 import { ActionButton } from '../../components/ActionButton';
@@ -13,7 +14,7 @@ import { OfferActions } from '../../deals/components/OfferActions';
 import { Page, Row, Rows, Stat, StatusLabel } from '../../components/ui-bits';
 import { cn } from '@/lib/utils';
 
-const TABS = ['overview', 'billing', 'pricing', 'seating', 'orders', 'expenses', 'settlement'];
+const TABS = ['overview', 'tickets', 'billing', 'pricing', 'seating', 'orders', 'expenses', 'settlement'];
 const PRICING_OPEN = ['hold', 'announced', 'presale', 'on_sale', 'sold_out', 'postponed', 'doors'];
 const OFFER_FIELDS = 'id status version dealType guaranteeCents percentageBps promoterProfitBps expenseCapCents merchSplitBps hardMerchSplitBps hospitalityRiderCents depositCents depositDueAt radiusClause breakevenBasis notes acceptedTerms artist { id name }';
 const SEAT_COLOR: Record<string, string> = { open: 'bg-emerald-500', held: 'bg-amber-500', sold: 'bg-zinc-800 dark:bg-zinc-200', killed: 'bg-red-500', comp: 'bg-sky-500', reserved_hold: 'bg-violet-500' };
@@ -25,7 +26,7 @@ export async function EventDetailPage({ params, searchParams }: { params: Promis
   const can = await roleFlags(...new Set(['canManageEvents', 'canManageDeals', 'canManageSettlements', ...grossReaders]));
   const seesGross = grossReaders.some((p) => can[p]);
   const data = await gql(`query($id: ID!) { event(where: { id: $id }) {
-    id title status showAt doorsAt curfewAt ageRestriction onSaleAt description sold held kills open ${seesGross ? 'gross' : ''} room { name city timezone } seatingChart { name version chartSection_chart(orderBy: [{ sort: asc }]) { id name kind capacity } } tour { name }
+    id title status showAt doorsAt curfewAt ageRestriction onSaleAt description sold held kills open ${seesGross ? 'gross' : ''} room { name city timezone } seatingChart { name version chartSection_chart(orderBy: [{ sort: asc }]) { id name kind capacity } }
     eventArtist_event(orderBy: [{ position: asc }]) { id billing position setMinutes artist { name } }
     offer_event(orderBy: [{ version: desc }]) { ${OFFER_FIELDS} }
     priceLevel_event(orderBy: [{ priceCents: desc }]) { id name status priceCents feeCents facilityFeeCents perOrderLimit capacity sold held productionHeld sections { id name } priceLevelPhase_priceLevel(orderBy: [{ sort: asc }]) { id name priceCents quantity sold sort startsAt } }
@@ -47,6 +48,14 @@ export async function EventDetailPage({ params, searchParams }: { params: Promis
   const totals = e.eventExpense_event.reduce((t: any, x: any) => ({ budget: t.budget + x.budgetCents, actual: t.actual + x.actualCents, capped: t.capped + (x.isCapped ? x.actualCents : 0) }), { budget: 0, actual: 0, capped: 0 });
   const orders = tab === 'orders' ? (await gql(`query($id: ID!) { ticketOrders(where: { hiddenAt: { equals: null }, event: { id: { equals: $id } } }, orderBy: [{ createdAt: desc }], take: 100) { id orderNumber status totalCents guestName } }`, { id })).ticketOrders : [];
   const seats = tab === 'seating' ? (await gql(`query($id: ID!) { seatInventories(where: { event: { id: { equals: $id } } }, take: 2000, orderBy: [{ id: asc }]) { id status seat { label row chartSection { name } } } }`, { id })).seatInventories : [];
+  // The tickets tab: who sells, total issued from every seller (D15), outside barcodes and the guest list.
+  const sources = tab === 'tickets' ? await gql(`query($id: ID!) { event(where: { id: $id }) { issuer externalSellerName externalUrl externalEventTitle connection { id siblingName status } }
+    issued: eventIssued(eventId: $id)
+    batches: externalTicketBatches(where: { event: { id: { equals: $id } } }, orderBy: [{ importedAt: desc }], take: 20) { id sellerName filename importedAt rowCount addedCount skippedCount voidedCount }
+    outside: externalTickets(where: { event: { id: { equals: $id } } }, orderBy: [{ holderName: asc }], take: 200) { id holderName ticketType barcodeLast4 status voidReason }
+    outsideCount: externalTicketsCount(where: { event: { id: { equals: $id } } })
+    guests: guestListEntries(where: { event: { id: { equals: $id } }, status: { not: { equals: "removed" } } }, orderBy: [{ name: asc }], take: 500) { id name plusOnes admittedCount addedFor note status }
+    connections: channelConnections(where: { status: { equals: "connected" } }) { id kind siblingName issuer status } }`, { id }).catch(() => null) : null;
   const bySection: Record<string, any[]> = {};
   for (const s of seats) (bySection[s.seat?.chartSection?.name || 'Seats'] ||= []).push(s);
   const base = `/dashboard/platform/events/${id}`;
@@ -58,6 +67,19 @@ export async function EventDetailPage({ params, searchParams }: { params: Promis
       </div></div>
       {tab === 'overview' && <div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><Stat name="Sold" value={e.sold} /><Stat name="Held" value={e.held} /><Stat name="Open" value={e.open} />{seesGross ? <Stat name="Gross" value={money(e.gross)} /> : null}
         <Stat name="Doors" value={when(e.doorsAt, e.room?.timezone)} /><Stat name="Curfew" value={when(e.curfewAt, e.room?.timezone)} /><Stat name="Age" value={label(e.ageRestriction)} /><Stat name="Chart" value={e.seatingChart ? `${e.seatingChart.name} v${e.seatingChart.version}` : ''} /></div>}
+      {tab === 'tickets' && sources && <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-6"><Stat name="Sold here" value={sources.issued.ownSold} /><Stat name="Comps" value={sources.issued.comps} /><Stat name="Connected seller" value={sources.issued.connectedSold} /><Stat name="Imported" value={sources.issued.imported} /><Stat name="Guest list" value={sources.issued.guestList} /><Stat name="Issued / capacity" value={`${sources.issued.total} / ${sources.issued.capacity || '–'}`} /></div>
+        {sources.issued.over ? <p role="alert" className="rounded-lg border-2 border-amber-600 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">Issued is {sources.issued.overBy} over the capacity of this configuration. Every seller’s tickets count against the same room.</p> : null}
+        {!sources.issued.fresh ? <p className="text-sm text-muted-foreground">{sources.issued.message}</p> : null}
+        <p className="text-sm">Sold by <span className="font-medium">{sources.event.issuer === 'own' ? 'our box office' : sources.event.externalSellerName}</span>{sources.event.externalEventTitle ? ` as “${sources.event.externalEventTitle}”` : ''}{sources.event.externalUrl ? <> · <a className="underline" href={sources.event.externalUrl} target="_blank" rel="noreferrer">their page</a></> : null}{sources.event.connection && sources.event.connection.status !== 'connected' ? ' · connection needs reconnecting' : ''}</p>
+        {can.canManageEvents && !['completed', 'settling', 'settled', 'cancelled'].includes(e.status) ? <IssuerPicker eventId={e.id} issuer={sources.event.issuer} connections={sources.connections} /> : null}
+        {can.canManageEvents && !['settled', 'cancelled'].includes(e.status) ? <ExternalImport eventId={e.id} sellerName={sources.event.issuer === 'other' ? sources.event.externalSellerName : ''} /> : null}
+        {sources.batches.length ? <Rows>{sources.batches.map((b: any) => <Row key={b.id} title={`${b.sellerName} · ${b.filename || 'import'}`} meta={`${b.rowCount} rows · ${b.addedCount} added · ${b.skippedCount} skipped · ${b.voidedCount} voided`} right={when(b.importedAt, e.room?.timezone)} />)}</Rows> : null}
+        {sources.outside.length ? <><h2 className="text-sm font-medium">Outside tickets ({sources.outsideCount})</h2><Rows>{sources.outside.map((t: any) => <Row key={t.id} title={t.holderName || `…${t.barcodeLast4}`} status={t.status === 'checked_in' ? 'confirmed' : t.status} meta={[t.ticketType, `…${t.barcodeLast4}`, t.voidReason].filter(Boolean).join(' · ')} right={can.canManageEvents && t.status === 'valid' ? <VoidExternal id={t.id} /> : null} />)}</Rows></> : null}
+        <h2 className="text-sm font-medium">Guest list</h2>
+        {can.canManageEvents && !['completed', 'settling', 'settled', 'cancelled'].includes(e.status) ? <GuestListEditor eventId={e.id} /> : null}
+        <Rows empty="Nobody on the guest list.">{sources.guests.map((g: any) => <Row key={g.id} title={`${g.name}${g.plusOnes ? ` +${g.plusOnes}` : ''}`} status={g.status === 'checked_in' ? 'confirmed' : g.status} meta={[label(g.addedFor), g.note, `${g.admittedCount} of ${1 + g.plusOnes} in`].filter(Boolean).join(' · ')} right={can.canManageEvents && g.admittedCount === 0 ? <RemoveGuest id={g.id} /> : null} />)}</Rows>
+      </div>}
       {tab === 'billing' && <div className="space-y-4">
         <Rows empty="No billing.">{e.eventArtist_event.map((a: any) => <Row key={a.id} title={a.artist.name} meta={`${label(a.billing)} · ${a.setMinutes || 0} min`} right={`#${a.position}`} />)}</Rows>
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-medium">Offers</h2>{can.canManageDeals && !['completed', 'settling', 'settled', 'cancelled'].includes(e.status) ? <OfferEditor eventId={e.id} artists={artists} /> : null}</div>

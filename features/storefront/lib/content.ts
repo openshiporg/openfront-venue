@@ -6,6 +6,8 @@ export type Show = {
   room: { id: string; name: string; city: string; address: string; timezone: string } | null;
   artists: { name: string; genre: string; billing: string }[];
   fromCents: number | null; currencyCode: string;
+  /** Who sells the tickets (W2.2): own box office, a connected Openfront, or another seller with a link. */
+  issuer: string; sellerName: string; sellerUrl: string;
 };
 export type PublicRoom = { id: string; name: string; city: string; address: string; capacity: number; photo: string | null; shows: number };
 
@@ -13,7 +15,7 @@ const LISTED = ['announced', 'presale', 'on_sale', 'sold_out', 'postponed'];
 /** A show whose start time has passed is no longer listed or sold, whatever its status. */
 const upcoming = () => ({ OR: [{ showAt: { gt: new Date().toISOString() } }, { showAt: { equals: null } }] });
 // Photos are uploaded by staff on the event and the venue (an event may instead carry an image link); their URLs are signed by the image field, so they are read through the list API.
-const QUERY = `id title status showAt doorsAt ageRestriction description image photo { url }
+const QUERY = `id title status showAt doorsAt ageRestriction description image photo { url } issuer externalSellerName externalUrl
   room { id name city address timezone capacity photo { url } }
   eventArtist_event(orderBy: [{ position: asc }]) { billing artist { name genreTags } }
   priceLevel_event(where: { status: { equals: "active" } }) { priceCents currencyCode priceLevelPhase_priceLevel { priceCents quantity sold startsAt sort } }`;
@@ -30,7 +32,8 @@ const toShow = (r: any): Show => {
     photo: r.photo?.url || r.image || null,
     room: r.room ? { id: r.room.id, name: r.room.name, city: r.room.city || '', address: r.room.address || '', timezone: r.room.timezone || '' } : null,
     artists: (r.eventArtist_event || []).filter((a: any) => a.artist?.name).map((a: any) => ({ name: a.artist.name, genre: a.artist.genreTags || '', billing: a.billing || '' })),
-    fromCents: prices.length ? Math.min(...prices) : null, currencyCode: r.priceLevel_event?.[0]?.currencyCode || 'USD',
+    fromCents: r.issuer && r.issuer !== 'own' ? null : prices.length ? Math.min(...prices) : null, currencyCode: r.priceLevel_event?.[0]?.currencyCode || 'USD',
+    issuer: r.issuer || 'own', sellerName: r.externalSellerName || '', sellerUrl: r.externalUrl || '',
   };
 };
 

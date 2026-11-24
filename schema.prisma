@@ -11,41 +11,144 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model SecretBox {
+  id         String    @id @default(cuid())
+  key        String    @unique @default("")
+  ciphertext String    @default("")
+  iv         String    @default("")
+  authTag    String    @default("")
+  keyVersion Int?      @default(1)
+  rotatedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+}
+
+model ChannelConnection {
+  id               String    @id @default(cuid())
+  kind             String
+  baseUrl          String    @default("")
+  issuer           String    @default("")
+  clientId         String    @default("")
+  siblingName      String    @default("")
+  siblingUserLabel String    @default("")
+  scopes           String    @default("")
+  status           String?   @default("pending")
+  stateHash        String    @default("")
+  pendingExpiresAt DateTime?
+  startedBy        User?     @relation("ChannelConnection_startedBy", fields: [startedById], references: [id])
+  startedById      String?   @map("startedBy")
+  connectedAt      DateTime?
+  lastUsedAt       DateTime?
+  lastRefreshedAt  DateTime?
+  lastError        String    @default("")
+  event_connection Event[]   @relation("Event_connection")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@index([stateHash])
+  @@index([startedById])
+}
+
+model ExternalTicketBatch {
+  id                   String           @id @default(cuid())
+  event                Event?           @relation("ExternalTicketBatch_event", fields: [eventId], references: [id])
+  eventId              String?          @map("event")
+  sellerName           String           @default("")
+  filename             String           @default("")
+  importedBy           User?            @relation("ExternalTicketBatch_importedBy", fields: [importedById], references: [id])
+  importedById         String?          @map("importedBy")
+  importedAt           DateTime?
+  rowCount             Int?             @default(0)
+  addedCount           Int?             @default(0)
+  skippedCount         Int?             @default(0)
+  voidedCount          Int?             @default(0)
+  externalTicket_batch ExternalTicket[] @relation("ExternalTicket_batch")
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @default(now()) @updatedAt
+
+  @@index([eventId])
+  @@index([importedById])
+}
+
+model ExternalTicket {
+  id                       String               @id @default(cuid())
+  batch                    ExternalTicketBatch? @relation("ExternalTicket_batch", fields: [batchId], references: [id])
+  batchId                  String?              @map("batch")
+  event                    Event?               @relation("ExternalTicket_event", fields: [eventId], references: [id])
+  eventId                  String?              @map("event")
+  barcodeHash              String               @default("")
+  barcodeLast4             String               @default("")
+  holderName               String               @default("")
+  ticketType               String               @default("")
+  status                   String?              @default("valid")
+  checkedInAt              DateTime?
+  voidReason               String               @default("")
+  scanEvent_externalTicket ScanEvent[]          @relation("ScanEvent_externalTicket")
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @default(now()) @updatedAt
+
+  @@index([batchId])
+  @@index([eventId])
+}
+
+model GuestListEntry {
+  id                       String      @id @default(cuid())
+  event                    Event?      @relation("GuestListEntry_event", fields: [eventId], references: [id])
+  eventId                  String?     @map("event")
+  name                     String      @default("")
+  plusOnes                 Int?        @default(0)
+  admittedCount            Int?        @default(0)
+  addedFor                 String?     @default("house")
+  note                     String      @default("")
+  status                   String?     @default("listed")
+  addedBy                  User?       @relation("GuestListEntry_addedBy", fields: [addedById], references: [id])
+  addedById                String?     @map("addedBy")
+  scanEvent_guestListEntry ScanEvent[] @relation("ScanEvent_guestListEntry")
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @default(now()) @updatedAt
+
+  @@index([eventId])
+  @@index([addedById])
+}
+
 model User {
-  id                               String            @id @default(cuid())
-  name                             String            @default("")
-  email                            String            @unique @default("")
+  id                               String                @id @default(cuid())
+  name                             String                @default("")
+  email                            String                @unique @default("")
   password                         String
-  role                             Role?             @relation("User_role", fields: [roleId], references: [id])
-  roleId                           String?           @map("role")
+  role                             Role?                 @relation("User_role", fields: [roleId], references: [id])
+  roleId                           String?               @map("role")
   hiddenAt                         DateTime?
   emailVerifiedAt                  DateTime?
   emailConfirmationSentAt          DateTime?
-  onboardingStatus                 String?           @default("not_started")
-  event_bookedBy                   Event[]           @relation("Event_bookedBy")
-  inquiry_handledBy                Inquiry[]         @relation("Inquiry_handledBy")
-  promoterPayment_recordedBy       PromoterPayment[] @relation("PromoterPayment_recordedBy")
-  barSales_recordedBy              BarSales[]        @relation("BarSales_recordedBy")
-  document_uploadedBy              Document[]        @relation("Document_uploadedBy")
-  inventoryHold_customer           InventoryHold[]   @relation("InventoryHold_customer")
-  ticketOrder_customer             TicketOrder[]     @relation("TicketOrder_customer")
-  scanEvent_scannedBy              ScanEvent[]       @relation("ScanEvent_scannedBy")
-  settlementLine_approvedBy        SettlementLine[]  @relation("SettlementLine_approvedBy")
-  auditEvent_actor                 AuditEvent[]      @relation("AuditEvent_actor")
-  storeSettings_manager            StoreSettings[]   @relation("StoreSettings_manager")
-  createdAt                        DateTime          @default(now())
-  updatedAt                        DateTime          @default(now()) @updatedAt
+  onboardingStatus                 String?               @default("not_started")
+  event_bookedBy                   Event[]               @relation("Event_bookedBy")
+  inquiry_handledBy                Inquiry[]             @relation("Inquiry_handledBy")
+  promoterPayment_recordedBy       PromoterPayment[]     @relation("PromoterPayment_recordedBy")
+  barSales_recordedBy              BarSales[]            @relation("BarSales_recordedBy")
+  document_uploadedBy              Document[]            @relation("Document_uploadedBy")
+  inventoryHold_customer           InventoryHold[]       @relation("InventoryHold_customer")
+  ticketOrder_customer             TicketOrder[]         @relation("TicketOrder_customer")
+  scanEvent_scannedBy              ScanEvent[]           @relation("ScanEvent_scannedBy")
+  channelConnection_startedBy      ChannelConnection[]   @relation("ChannelConnection_startedBy")
+  externalTicketBatch_importedBy   ExternalTicketBatch[] @relation("ExternalTicketBatch_importedBy")
+  guestListEntry_addedBy           GuestListEntry[]      @relation("GuestListEntry_addedBy")
+  settlementLine_approvedBy        SettlementLine[]      @relation("SettlementLine_approvedBy")
+  auditEvent_actor                 AuditEvent[]          @relation("AuditEvent_actor")
+  storeSettings_manager            StoreSettings[]       @relation("StoreSettings_manager")
+  createdAt                        DateTime              @default(now())
+  updatedAt                        DateTime              @default(now()) @updatedAt
   passwordResetToken               String?
   passwordResetIssuedAt            DateTime?
   passwordResetRedeemedAt          DateTime?
-  from_OAuthToken_user             OAuthToken[]      @relation("OAuthToken_user")
-  from_Payment_processedBy         Payment[]         @relation("Payment_processedBy")
-  from_Refund_requestedBy          Refund[]          @relation("Refund_requestedBy")
-  from_Refund_approvedBy           Refund[]          @relation("Refund_approvedBy")
-  from_ManagerApproval_requestedBy ManagerApproval[] @relation("ManagerApproval_requestedBy")
-  from_ManagerApproval_approvedBy  ManagerApproval[] @relation("ManagerApproval_approvedBy")
-  from_CashDrawer_openedBy         CashDrawer[]      @relation("CashDrawer_openedBy")
-  from_CashDrawer_closedBy         CashDrawer[]      @relation("CashDrawer_closedBy")
+  from_OAuthToken_user             OAuthToken[]          @relation("OAuthToken_user")
+  from_Payment_processedBy         Payment[]             @relation("Payment_processedBy")
+  from_Refund_requestedBy          Refund[]              @relation("Refund_requestedBy")
+  from_Refund_approvedBy           Refund[]              @relation("Refund_approvedBy")
+  from_ManagerApproval_requestedBy ManagerApproval[]     @relation("ManagerApproval_requestedBy")
+  from_ManagerApproval_approvedBy  ManagerApproval[]     @relation("ManagerApproval_approvedBy")
+  from_CashDrawer_openedBy         CashDrawer[]          @relation("CashDrawer_openedBy")
+  from_CashDrawer_closedBy         CashDrawer[]          @relation("CashDrawer_closedBy")
 
   @@index([roleId])
 }
@@ -241,59 +344,72 @@ model Artist {
 }
 
 model Event {
-  id                   String           @id @default(cuid())
-  title                String           @default("")
-  presaleCode          String           @default("")
-  image                String           @default("")
-  photo_id             String?
-  photo_filesize       Int?
-  photo_width          Int?
-  photo_height         Int?
-  photo_extension      String?
-  description          String           @default("")
-  isCoPro              Boolean          @default(false)
-  allowReentry         Boolean          @default(false)
-  doorsAt              DateTime?
-  showAt               DateTime?
-  curfewAt             DateTime?
-  announceAt           DateTime?
-  onSaleAt             DateTime?
-  presaleAt            DateTime?
-  refundWindowEndsAt   DateTime?
-  status               String?          @default("hold")
-  ageRestriction       String?          @default("all_ages")
-  room                 Room?            @relation("Event_room", fields: [roomId], references: [id])
-  roomId               String?          @map("room")
-  seatingChart         SeatingChart?    @relation("Event_seatingChart", fields: [seatingChartId], references: [id])
-  seatingChartId       String?          @map("seatingChart")
-  bookedBy             User?            @relation("Event_bookedBy", fields: [bookedById], references: [id])
-  bookedById           String?          @map("bookedBy")
-  promoter             Promoter?        @relation("Event_promoter", fields: [promoterId], references: [id])
-  promoterId           String?          @map("promoter")
-  eventArtist_event    EventArtist[]    @relation("EventArtist_event")
-  dateHold_event       DateHold[]       @relation("DateHold_event")
-  offer_event          Offer[]          @relation("Offer_event")
-  eventExpense_event   EventExpense[]   @relation("EventExpense_event")
-  priceLevel_event     PriceLevel[]     @relation("PriceLevel_event")
-  seatInventory_event  SeatInventory[]  @relation("SeatInventory_event")
-  productionHold_event ProductionHold[] @relation("ProductionHold_event")
-  inventoryHold_event  InventoryHold[]  @relation("InventoryHold_event")
-  promoCode_event      PromoCode[]      @relation("PromoCode_event")
-  ticketOrder_event    TicketOrder[]    @relation("TicketOrder_event")
-  ticket_event         Ticket[]         @relation("Ticket_event")
-  scanEvent_event      ScanEvent[]      @relation("ScanEvent_event")
-  merchSales_event     MerchSales[]     @relation("MerchSales_event")
-  barSales_event       BarSales[]       @relation("BarSales_event")
-  settlement_event     Settlement[]     @relation("Settlement_event")
-  venueDeal_event      VenueDeal[]      @relation("VenueDeal_event")
-  document_event       Document[]       @relation("Document_event")
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @default(now()) @updatedAt
+  id                        String                @id @default(cuid())
+  title                     String                @default("")
+  presaleCode               String                @default("")
+  image                     String                @default("")
+  photo_id                  String?
+  photo_filesize            Int?
+  photo_width               Int?
+  photo_height              Int?
+  photo_extension           String?
+  description               String                @default("")
+  isCoPro                   Boolean               @default(false)
+  allowReentry              Boolean               @default(false)
+  doorsAt                   DateTime?
+  showAt                    DateTime?
+  curfewAt                  DateTime?
+  announceAt                DateTime?
+  onSaleAt                  DateTime?
+  presaleAt                 DateTime?
+  refundWindowEndsAt        DateTime?
+  status                    String?               @default("hold")
+  ageRestriction            String?               @default("all_ages")
+  room                      Room?                 @relation("Event_room", fields: [roomId], references: [id])
+  roomId                    String?               @map("room")
+  seatingChart              SeatingChart?         @relation("Event_seatingChart", fields: [seatingChartId], references: [id])
+  seatingChartId            String?               @map("seatingChart")
+  bookedBy                  User?                 @relation("Event_bookedBy", fields: [bookedById], references: [id])
+  bookedById                String?               @map("bookedBy")
+  promoter                  Promoter?             @relation("Event_promoter", fields: [promoterId], references: [id])
+  promoterId                String?               @map("promoter")
+  eventArtist_event         EventArtist[]         @relation("EventArtist_event")
+  dateHold_event            DateHold[]            @relation("DateHold_event")
+  offer_event               Offer[]               @relation("Offer_event")
+  eventExpense_event        EventExpense[]        @relation("EventExpense_event")
+  priceLevel_event          PriceLevel[]          @relation("PriceLevel_event")
+  seatInventory_event       SeatInventory[]       @relation("SeatInventory_event")
+  productionHold_event      ProductionHold[]      @relation("ProductionHold_event")
+  inventoryHold_event       InventoryHold[]       @relation("InventoryHold_event")
+  promoCode_event           PromoCode[]           @relation("PromoCode_event")
+  ticketOrder_event         TicketOrder[]         @relation("TicketOrder_event")
+  ticket_event              Ticket[]              @relation("Ticket_event")
+  scanEvent_event           ScanEvent[]           @relation("ScanEvent_event")
+  merchSales_event          MerchSales[]          @relation("MerchSales_event")
+  barSales_event            BarSales[]            @relation("BarSales_event")
+  settlement_event          Settlement[]          @relation("Settlement_event")
+  venueDeal_event           VenueDeal[]           @relation("VenueDeal_event")
+  document_event            Document[]            @relation("Document_event")
+  issuer                    String?               @default("own")
+  connection                ChannelConnection?    @relation("Event_connection", fields: [connectionId], references: [id])
+  connectionId              String?               @map("connection")
+  externalEventId           String                @default("")
+  externalEventTitle        String                @default("")
+  externalUrl               String                @default("")
+  externalSellerName        String                @default("")
+  connectedSold             Int?                  @default(0)
+  connectedSoldAt           DateTime?
+  externalTicketBatch_event ExternalTicketBatch[] @relation("ExternalTicketBatch_event")
+  externalTicket_event      ExternalTicket[]      @relation("ExternalTicket_event")
+  guestListEntry_event      GuestListEntry[]      @relation("GuestListEntry_event")
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @default(now()) @updatedAt
 
   @@index([roomId])
   @@index([seatingChartId])
   @@index([bookedById])
   @@index([promoterId])
+  @@index([connectionId])
 }
 
 model EventArtist {
@@ -833,19 +949,31 @@ model Ticket {
 }
 
 model ScanEvent {
-  id          String    @id @default(cuid())
-  gate        String    @default("")
-  at          DateTime?
-  result      String?   @default("admitted")
-  ticket      Ticket?   @relation("ScanEvent_ticket", fields: [ticketId], references: [id])
-  ticketId    String?   @map("ticket")
-  event       Event?    @relation("ScanEvent_event", fields: [eventId], references: [id])
-  eventId     String?   @map("event")
-  scannedBy   User?     @relation("ScanEvent_scannedBy", fields: [scannedById], references: [id])
-  scannedById String?   @map("scannedBy")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
+  id               String          @id @default(cuid())
+  gate             String          @default("")
+  at               DateTime?
+  source           String?         @default("own")
+  result           String?         @default("admitted")
+  issuerResult     String          @default("")
+  message          String          @default("")
+  codeLast4        String          @default("")
+  places           Int?            @default(1)
+  idChecked        Boolean         @default(false)
+  externalTicket   ExternalTicket? @relation("ScanEvent_externalTicket", fields: [externalTicketId], references: [id])
+  externalTicketId String?         @map("externalTicket")
+  guestListEntry   GuestListEntry? @relation("ScanEvent_guestListEntry", fields: [guestListEntryId], references: [id])
+  guestListEntryId String?         @map("guestListEntry")
+  ticket           Ticket?         @relation("ScanEvent_ticket", fields: [ticketId], references: [id])
+  ticketId         String?         @map("ticket")
+  event            Event?          @relation("ScanEvent_event", fields: [eventId], references: [id])
+  eventId          String?         @map("event")
+  scannedBy        User?           @relation("ScanEvent_scannedBy", fields: [scannedById], references: [id])
+  scannedById      String?         @map("scannedBy")
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
 
+  @@index([externalTicketId])
+  @@index([guestListEntryId])
   @@index([ticketId])
   @@index([eventId])
   @@index([scannedById])

@@ -44,8 +44,9 @@ import { PaymentWebhookEvent } from './PaymentWebhookEvent';
 import { IdempotencyKey } from './IdempotencyKey';
 import { ManagerApproval } from './ManagerApproval';
 import { CashDrawer } from './CashDrawer';
+import { SecretBox, ChannelConnection, ExternalTicketBatch, ExternalTicket, GuestListEntry } from './Door';
 import { filterFollowsRead } from '../filter-access';
-const baseModels = { User, Role, OAuthApp, OAuthToken, Room, SeatingChart, ChartSection, Seat, Agency, Artist, Event, EventArtist, DateHold, Promoter, Inquiry, VenueDeal, HouseExpense, PromoterPayment, Document, Offer, EventExpense, PriceLevel, PriceLevelPhase, SeatInventory, ProductionHold, InventoryHold, PromoCode, PromoRedemption, TicketOrder, TicketOrderLine, Ticket, ScanEvent, MerchSales, BarSales, Settlement, SettlementLine, ArtistPayment, AuditEvent, StoreSettings, PaymentProvider, PaymentCollection, PaymentSession, Payment, Refund, PaymentWebhookEvent, IdempotencyKey, ManagerApproval, CashDrawer };
+const baseModels = { SecretBox, ChannelConnection, ExternalTicketBatch, ExternalTicket, GuestListEntry, User, Role, OAuthApp, OAuthToken, Room, SeatingChart, ChartSection, Seat, Agency, Artist, Event, EventArtist, DateHold, Promoter, Inquiry, VenueDeal, HouseExpense, PromoterPayment, Document, Offer, EventExpense, PriceLevel, PriceLevelPhase, SeatInventory, ProductionHold, InventoryHold, PromoCode, PromoRedemption, TicketOrder, TicketOrderLine, Ticket, ScanEvent, MerchSales, BarSales, Settlement, SettlementLine, ArtistPayment, AuditEvent, StoreSettings, PaymentProvider, PaymentCollection, PaymentSession, Payment, Refund, PaymentWebhookEvent, IdempotencyKey, ManagerApproval, CashDrawer };
 const allModels = filterFollowsRead(baseModels as any) as typeof baseModels;
 // Narrow the sidebar and create links per role from each list's own operation access.
 type Gate = (args: { session?: unknown }) => unknown;

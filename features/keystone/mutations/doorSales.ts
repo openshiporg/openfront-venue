@@ -46,6 +46,8 @@ async function issue(kind: Kind, input: any, context: any) {
     await expireHolds(tx, input.eventId);
     const event = await tx.event.findUnique({ where: { id: input.eventId }, include: { room: true } });
     if (!event || !DOOR_STATUSES.includes(event.status)) throw new Error('Event is not selling');
+    // Another seller's night: the venue may still comp house guests, but never sells the room twice (D15).
+    if (kind === 'door' && event.issuer && event.issuer !== 'own') throw new Error(`Tickets for this show are sold by ${event.externalSellerName || 'another seller'}; add a comp or a guest-list entry instead`);
     const level = await tx.priceLevel.findUnique({ where: { id: input.levelId }, include: { sections: true } });
     if (!level || level.eventId !== event.id || level.status !== 'active') throw new Error('Invalid price level');
     const reserved = level.sections.some((s: any) => s.kind !== 'ga');

@@ -2,6 +2,9 @@ import { list, graphql } from '@keystone-6/core';
 import { image, text, integer, checkbox, json, select, relationship, timestamp, virtual } from '@keystone-6/core/fields';
 import { trackingFields } from './trackingFields';
 import { commandAccess, catalogAccess, permissions, canReadGross } from '../access';
+import { ISSUERS } from '../lib/venue-deal';
+import { issuedCounts } from '../lib/issued';
+const setByCommand = { access: { create: () => false, update: () => false } };
 
 export const Event = list({
  access: catalogAccess,
@@ -45,6 +48,21 @@ export const Event = list({
   settlement_event: relationship({ ref: 'Settlement.event', many: true }),
   venueDeal_event: relationship({ ref: 'VenueDeal.event', many: true }),
   document_event: relationship({ ref: 'Document.event', many: true }),
+  // D3: who sells tickets for this night. Set with setEventIssuer only.
+  issuer: select({ type: 'string', options: ISSUERS.map(value => ({ label: value.replace(/_/g, ' '), value })), defaultValue: 'own', ...setByCommand }),
+  connection: relationship({ ref: 'ChannelConnection.event_connection', many: false, ...setByCommand }),
+  externalEventId: text({ ...setByCommand }),
+  externalEventTitle: text({ ...setByCommand }),
+  externalUrl: text({ ...setByCommand }),
+  externalSellerName: text({ ...setByCommand }),
+  // The connected issuer's sold count from the last live read, kept so the door still shows a number when the seller is not answering.
+  connectedSold: integer({ defaultValue: 0, ...setByCommand }),
+  connectedSoldAt: timestamp({ ...setByCommand }),
+  externalTicketBatch_event: relationship({ ref: 'ExternalTicketBatch.event', many: true, ...setByCommand }),
+  externalTicket_event: relationship({ ref: 'ExternalTicket.event', many: true, ...setByCommand }),
+  guestListEntry_event: relationship({ ref: 'GuestListEntry.event', many: true, ...setByCommand }),
+  // D15: everyone let in or entitled to come in, from every seller, against the configuration's capacity.
+  totalIssued: virtual({ field: graphql.field({ type: graphql.Int, async resolve(item: any, args, context) { return (await issuedCounts(context.prisma, item.id)).total; } }) }),
   sold: virtual({ field: graphql.field({ type: graphql.Int, async resolve(item, args, context) { const r = await context.prisma.priceLevel.aggregate({ where: { eventId: item.id }, _sum: { sold: true } }); return r._sum.sold ?? 0; } }) }),
   held: virtual({ field: graphql.field({ type: graphql.Int, async resolve(item, args, context) { const r = await context.prisma.priceLevel.aggregate({ where: { eventId: item.id }, _sum: { held: true } }); return r._sum.held ?? 0; } }) }),
   kills: virtual({ field: graphql.field({ type: graphql.Int, async resolve(item, args, context) { return context.prisma.seatInventory.count({ where: { eventId: item.id, ...{status: 'killed'} } }); } }) }),

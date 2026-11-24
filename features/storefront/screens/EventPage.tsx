@@ -3,8 +3,11 @@ import { billLine, genreOf } from '../lib/content';
 import { day, clock, ages } from '../lib/format';
 import { Photo } from '../components/Photo';
 import { EventBuy } from './EventBuy';
+import { usd } from '../lib/format';
 
-export function EventPage({ show: s, buyer }: { show: Show; buyer?: { name: string; email: string } | null }) {
+type Seller = { live: boolean; levels: { name: string; allInCents: number; soldOut: boolean }[]; soldOut: boolean | null; message?: string } | null;
+
+export function EventPage({ show: s, buyer, seller }: { show: Show; buyer?: { name: string; email: string } | null; seller?: Seller }) {
   const tz = s.room?.timezone;
   return (
     <main>
@@ -22,7 +25,11 @@ export function EventPage({ show: s, buyer }: { show: Show; buyer?: { name: stri
           {s.description ? <p className="mt-4 max-w-prose">{s.description}</p> : null}
         </header>
       </div>
-      <EventBuy eventId={s.id} status={s.status} buyer={buyer} />
+      {s.issuer === 'own' ? <EventBuy eventId={s.id} status={s.status} buyer={buyer} /> : <section className="mt-8 max-w-xl rounded-lg border border-black/15 p-5">
+        <h2 className="text-lg font-semibold">Tickets from {s.sellerName || 'the promoter'}</h2>
+        {seller?.live && seller.levels.length ? <ul className="mt-3 divide-y divide-black/10">{seller.levels.map(l => <li key={l.name} className="flex justify-between py-2 text-[15px]"><span>{l.name}</span><span>{l.soldOut ? 'Sold out' : `${usd(l.allInCents)} all in`}</span></li>)}</ul> : <p className="mt-2 text-[15px] text-black/70">{seller?.message || 'Prices and availability are on the seller’s page.'}</p>}
+        {s.sellerUrl && !seller?.soldOut ? <a href={s.sellerUrl} className="mt-4 inline-flex h-11 items-center rounded-md bg-black px-5 font-medium text-white">Buy on {s.sellerName || 'the seller’s site'}</a> : seller?.soldOut ? <p className="mt-3 font-medium">Sold out</p> : null}
+      </section>}
     </main>
   );
 }

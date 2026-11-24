@@ -12,7 +12,7 @@ import { runHoldCommand } from './calendar';
 export function authorize(context: any, permission: Permission) {
   if (!permissions[permission]({ session: context.session })) throw new Error(permissionRefusal(permission));
 }
-const required: Record<string, Permission> = { releaseDateHold: 'canManageEvents', advanceEvent: 'canManageEvents', placeDateHold: 'canManageEvents', challengeHold: 'canManageEvents', confirmHold: 'canManageEvents', sendOffer: 'canManageDeals', acceptOffer: 'canManageDeals', declineOffer: 'canManageDeals', contractOffer: 'canManageDeals', publishEvent: 'canManageEvents', setProductionHold: 'canManageInventory', releaseProductionHold: 'canManageInventory', scanTicket: 'canScanTickets', recordMerchSales: 'canManageSettlements', computeSettlement: 'canManageSettlements', adjustSettlement: 'canManageSettlements', signSettlement: 'canManageSettlements', recordArtistPayment: 'canManageSettlements', postponeEvent: 'canManageEvents', cancelEvent: 'canManageEvents' };
+const required: Record<string, Permission> = { releaseDateHold: 'canManageEvents', advanceEvent: 'canManageEvents', placeDateHold: 'canManageEvents', challengeHold: 'canManageEvents', confirmHold: 'canManageEvents', sendOffer: 'canManageDeals', acceptOffer: 'canManageDeals', declineOffer: 'canManageDeals', contractOffer: 'canManageDeals', publishEvent: 'canManageEvents', setProductionHold: 'canManageInventory', releaseProductionHold: 'canManageInventory', recordMerchSales: 'canManageSettlements', computeSettlement: 'canManageSettlements', adjustSettlement: 'canManageSettlements', signSettlement: 'canManageSettlements', recordArtistPayment: 'canManageSettlements', postponeEvent: 'canManageEvents', cancelEvent: 'canManageEvents' };
 export function operator(operation: string) {
   return async (_: any, { input }: any, context: any) => {
     authorize(context, required[operation]);
@@ -103,17 +103,6 @@ export function operator(operation: string) {
         const row = await tx.productionHold.findUnique({ where: { id: input.productionHoldId }, include: { seats: true } });
         if (!row || row.status !== 'active') throw new Error('Active production hold required');
         await releaseBlock(tx, row); await audit('ProductionHold', row.id, { status: 'released' }); return { id: row.id, status: 'released' };
-      }
-      if (operation === 'scanTicket') {
-        const ticket = input.token ? await tx.ticket.findFirst({ where: { tokenHash: digest(input.token) } }) : await tx.ticket.findUnique({ where: { ticketCode: input.ticketCode || '' } });
-        if (!ticket) throw new Error('Ticket not found');
-        const event = await tx.event.findUnique({ where: { id: eventId } });
-        if (!event) throw new Error('Event not found');
-        let result = ticket.eventId !== eventId ? 'wrong_event' : ['void','refunded','transferred'].includes(ticket.status) ? 'void' : ticket.status === 'checked_in' ? event.allowReentry ? 'reentry' : 'duplicate' : 'admitted';
-        if (result === 'admitted' && !['doors','in_progress'].includes(event.status)) throw new Error('Doors are not open');
-        if (result === 'admitted') await transition(tx, 'ticket', ticket.id, 'valid', 'checked_in', actor);
-        const scan = await tx.scanEvent.create({ data: { ticketId: ticket.id, eventId, gate: input.gate || 'Main', scannedById: actor, at: new Date(), result } });
-        return { id: scan.id, result, admitted: await tx.ticket.count({ where: { eventId, status: 'checked_in' } }) };
       }
       if (operation === 'recordMerchSales') {
         const deal = await tx.offer.findFirst({ where: { eventId, status: { in: ['accepted','contracted','settled'] } } });

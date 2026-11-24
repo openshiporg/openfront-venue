@@ -96,7 +96,7 @@ export const User = list({
     // Public sign-up cannot attach orders, holds or settings to the new account; checkout and email confirmation do that.
     ...relationsManagedBy({
       event_bookedBy: 'Event.bookedBy', inquiry_handledBy: 'Inquiry.handledBy', promoterPayment_recordedBy: 'PromoterPayment.recordedBy', barSales_recordedBy: 'BarSales.recordedBy', document_uploadedBy: 'Document.uploadedBy', inventoryHold_customer: 'InventoryHold.customer', ticketOrder_customer: 'TicketOrder.customer',
-      scanEvent_scannedBy: 'ScanEvent.scannedBy', settlementLine_approvedBy: 'SettlementLine.approvedBy', auditEvent_actor: 'AuditEvent.actor', storeSettings_manager: 'StoreSettings.manager',
+      scanEvent_scannedBy: 'ScanEvent.scannedBy', channelConnection_startedBy: 'ChannelConnection.startedBy', externalTicketBatch_importedBy: 'ExternalTicketBatch.importedBy', guestListEntry_addedBy: 'GuestListEntry.addedBy', settlementLine_approvedBy: 'SettlementLine.approvedBy', auditEvent_actor: 'AuditEvent.actor', storeSettings_manager: 'StoreSettings.manager',
     }),
     ...trackingFields,
   },
