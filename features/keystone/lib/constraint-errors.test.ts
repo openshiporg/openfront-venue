@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 import { GraphQLError } from 'graphql'
 import { CONSTRAINT_MESSAGES, constraintGraphQLError, constraintRefusal } from './constraint-errors'
 
 test('every rule in the migration has a readable message, and no message is orphaned', () => {
-  const sql = readFileSync(new URL('../../../migrations/20261124022500_venue_invariants/migration.sql', import.meta.url), 'utf8')
-  const names = [...sql.matchAll(/(?:ADD CONSTRAINT|CREATE (?:UNIQUE INDEX|CONSTRAINT TRIGGER|TRIGGER)) "([^"]+)"/g)].map(m => m[1])
+  const root = new URL('../../../migrations/', import.meta.url)
+  const sql = readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory() && !d.name.endsWith('_init_venue')).map(d => readFileSync(new URL(`${d.name}/migration.sql`, root), 'utf8')).join('\n')
+  const names = [...sql.split('\n').filter(l => !/FOREIGN KEY|PRIMARY KEY/.test(l)).join('\n').matchAll(/(?:ADD CONSTRAINT|CREATE (?:UNIQUE INDEX|CONSTRAINT TRIGGER|TRIGGER)) "([^"]+)"/g)].map(m => m[1])
   assert(names.length >= 50)
   for (const name of names) assert(CONSTRAINT_MESSAGES[name], `${name} has no message`)
   for (const name of Object.keys(CONSTRAINT_MESSAGES)) assert(names.includes(name), `${name} is not in the migration`)

@@ -16,7 +16,7 @@
         "canManageEvents",
         "canManageDeals",
         "canManageRooms",
-        "canManageArtists",
+        "canManageContacts",
         "canManageInventory"
       ]
     },

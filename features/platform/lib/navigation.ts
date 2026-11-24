@@ -1,4 +1,4 @@
-import { CalendarDays, Ticket, Handshake, Store, ScanLine, FileSpreadsheet, Building2, Mic2, ReceiptText, Tag, CreditCard, Users, Settings, LucideIcon } from 'lucide-react'
+import { Inbox, CalendarDays, Ticket, Handshake, Store, ScanLine, FileSpreadsheet, Building2, Mic2, ReceiptText, Tag, CreditCard, Users, Settings, LucideIcon } from 'lucide-react'
 
 export interface PlatformNavItem {
   title: string
@@ -21,6 +21,7 @@ export interface PlatformNavGroup {
 export const platformNavItems: PlatformNavItem[] = [
   { title: 'Events', href: '/platform/events', color: 'blue', description: 'Shows by status with pricing, seating and settlement.', icon: Ticket, group: 'standalone' },
   { title: 'Calendar', href: '/platform/calendar', color: 'purple', description: 'Ranked date holds per room.', icon: CalendarDays, group: 'standalone' },
+  { title: 'Inquiries', href: '/platform/inquiries', color: 'amber', description: 'Requests from promoters and clients.', icon: Inbox, group: 'standalone', requires: ['canManageInquiries'] },
   { title: 'Deals', href: '/platform/deals', color: 'indigo', description: 'Artist offers and the deal calculator.', icon: Handshake, group: 'standalone', requires: ['canManageDeals', 'canManageSettlements'] },
   { title: 'Box office', href: '/platform/box-office', color: 'teal', description: 'Find orders, refund and transfer.', icon: Store, group: 'standalone', requires: ['canManageOrders', 'canIssueRefunds'] },
   { title: 'Door scan', href: '/platform/door', color: 'orange', description: 'Gate scanning and live admitted count.', icon: ScanLine, group: 'standalone', requires: ['canScanTickets'] },

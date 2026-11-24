@@ -17,6 +17,7 @@ export const viewport: Viewport = { colorScheme: 'light', themeColor: '#f2f2f2' 
 const items = [
   { href: '/', label: 'Shows' },
   { href: '/#rooms', label: 'Rooms' },
+  { href: '/inquire', label: 'Host with us' },
   { href: '/lookup', label: 'Find my order' },
 ];
 
@@ -40,6 +41,7 @@ export default async function StorefrontLayout({ children }: { children: React.R
               {store.refundPolicy ? <p className="max-w-prose">{store.refundPolicy}</p> : null}
             </div>
             <ul className="flex flex-wrap gap-x-5 sm:flex-col sm:items-end">
+              <li><Link className="inline-flex min-h-11 items-center hover:underline underline-offset-4" href="/inquire">Host with us</Link></li>
               <li><Link className="inline-flex min-h-11 items-center hover:underline underline-offset-4" href="/lookup">Find my order</Link></li>
               <li><Link className="inline-flex min-h-11 items-center hover:underline underline-offset-4" href={account.href}>{me ? 'My account' : 'Sign in or create an account'}</Link></li>
             </ul>

@@ -3,7 +3,9 @@ export const permissionNames = [
   'canAccessDashboard', 'canManageOnboarding', 'canManagePayments', 'canReadPayments',
   'canIssueRefunds', 'canReadAudit', 'canManageEvents', 'canManageDeals',
   'canManageInventory', 'canManageOrders', 'canScanTickets', 'canManageSettlements',
-  'canApproveAdjustments', 'canManageRooms', 'canManageArtists',
+  'canApproveAdjustments', 'canManageRooms', 'canManageContacts',
+  'canManageInquiries', 'canManageVenueDeals', 'canManageAdvance', 'canManageStaff',
+  'canManageInsurance', 'canManageConnections', 'canManagePrivateEvents',
 ] as const;
 export type Permission = typeof permissionNames[number];
 export type Session = { itemId: string; listKey: string; data: { name: string; email?: string; role?: { id: string; name: string } & Record<Permission, boolean> } };
@@ -16,7 +18,9 @@ const permissionActions: Record<Permission, string> = {
   canAccessDashboard: 'use the dashboard', canManageOnboarding: 'run store setup', canManagePayments: 'manage payments', canReadPayments: 'view payments',
   canIssueRefunds: 'issue refunds', canReadAudit: 'view the audit log', canManageEvents: 'manage events', canManageDeals: 'manage deals',
   canManageInventory: 'manage inventory', canManageOrders: 'manage orders', canScanTickets: 'scan tickets', canManageSettlements: 'manage settlements',
-  canApproveAdjustments: 'approve adjustments', canManageRooms: 'manage rooms', canManageArtists: 'manage artists',
+  canApproveAdjustments: 'approve adjustments', canManageRooms: 'manage rooms', canManageContacts: 'manage contacts',
+  canManageInquiries: 'manage inquiries', canManageVenueDeals: 'manage venue deals', canManageAdvance: 'advance shows', canManageStaff: 'manage staff and shifts',
+  canManageInsurance: 'manage insurance certificates', canManageConnections: 'manage connections', canManagePrivateEvents: 'manage private events',
 };
 export const permissionRefusal = (permission: Permission) => `Your role does not allow you to ${permissionActions[permission]}.`;
 export const commandAccess = { operation: { query: permissions.canAccessDashboard, create: () => false, update: () => false, delete: () => false } };

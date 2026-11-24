@@ -95,7 +95,7 @@ export const User = list({
     onboardingStatus: select({ options: ['not_started', 'in_progress', 'completed', 'dismissed'], defaultValue: 'not_started' }),
     // Public sign-up cannot attach orders, holds or settings to the new account; checkout and email confirmation do that.
     ...relationsManagedBy({
-      event_promoter: 'Event.promoter', inventoryHold_customer: 'InventoryHold.customer', ticketOrder_customer: 'TicketOrder.customer',
+      event_promoter: 'Event.promoter', inquiry_handledBy: 'Inquiry.handledBy', inventoryHold_customer: 'InventoryHold.customer', ticketOrder_customer: 'TicketOrder.customer',
       scanEvent_scannedBy: 'ScanEvent.scannedBy', settlementLine_approvedBy: 'SettlementLine.approvedBy', auditEvent_actor: 'AuditEvent.actor', storeSettings_manager: 'StoreSettings.manager',
     }),
     ...trackingFields,

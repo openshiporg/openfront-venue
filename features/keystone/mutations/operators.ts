@@ -7,6 +7,7 @@ import { expireHolds, releaseBlock } from './inventory';
 import { assertEventTransition } from '../lib/event-lifecycle';
 import { zonedDateTime, holdDay } from '../lib/venue-time';
 import { validateCountMaps } from '../lib/editors';
+import { runHoldCommand } from './calendar';
 
 export function authorize(context: any, permission: Permission) {
   if (!permissions[permission]({ session: context.session })) throw new Error(permissionRefusal(permission));
@@ -32,52 +33,7 @@ export function operator(operation: string) {
     const lock = operation.includes('Hold') && ['placeDateHold', 'challengeHold', 'confirmHold', 'releaseDateHold'].includes(operation) ? `date:${input.roomId}:${String(input.date).slice(0, 10)}` : `event:${eventId}`;
     return command(context, { operation, idempotencyKey: input.idempotencyKey, lock, params: input }, async tx => {
       const audit = async (list: string, id: string, after: any, reason = '') => appendAuditEvent(tx, actor, { action: operation, targetList: list, targetId: id, after, reason });
-      if (operation === 'placeDateHold') {
-        const date = new Date(input.date); if (Number.isNaN(+date) || !Number.isInteger(input.rank) || input.rank < 1) throw new Error('Valid date and positive rank required');
-        if (!input.roomId || !(await tx.room.findUnique({ where: { id: input.roomId } }))) throw new Error('Room required');
-        if (date < new Date(holdDay(new Date().toISOString()))) throw new Error('Date is in the past');
-        if (input.artistId && !(await tx.artist.findUnique({ where: { id: input.artistId } }))) throw new Error('Artist not found');
-        if (input.expiresAt && !(new Date(input.expiresAt) > new Date())) throw new Error('Expiry must be in the future');
-        if (await tx.dateHold.count({ where: { roomId: input.roomId, date, status: 'confirmed' } })) throw new Error('Date is already confirmed');
-        // A lapsed hold keeps its rank key forever unless it is released; the rank is free again once it has expired.
-        const lapsed = await tx.dateHold.findMany({ where: { roomId: input.roomId, date, status: { in: ['held', 'challenged'] }, expiresAt: { lte: new Date() } } });
-        for (const l of lapsed) await transition(tx, 'dateHold', l.id, l.status, 'released', actor, 'Hold expired', { rankKey: null });
-        const rankKey = `${input.roomId}:${date.toISOString().slice(0, 10)}:${input.rank}`;
-        if (await tx.dateHold.findUnique({ where: { rankKey } })) throw new Error(`Rank ${input.rank} is already held for this date`);
-        const row = await tx.dateHold.create({ data: { roomId: input.roomId, date, artistId: input.artistId, agencyId: input.agencyId, rank: input.rank, rankKey, status: 'held', expiresAt: input.expiresAt ? new Date(input.expiresAt) : new Date(Date.now() + 604800000) } });
-        await audit('DateHold', row.id, { rank: row.rank }); return { id: row.id, status: row.status };
-      }
-      if (operation === 'releaseDateHold') {
-        const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
-        if (!row || !['held', 'challenged'].includes(row.status)) throw new Error('Only an unconfirmed hold can be released');
-        await transition(tx, 'dateHold', row.id, row.status, 'released', actor, input.reason || 'Released by staff', { rankKey: null });
-        return { id: row.id, status: 'released' };
-      }
-      if (operation === 'challengeHold') {
-        const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
-        if (!row || row.expiresAt <= new Date()) throw new Error('Hold expired');
-        await transition(tx, 'dateHold', row.id, 'held', 'challenged', actor); return { id: row.id, status: 'challenged' };
-      }
-      if (operation === 'confirmHold') {
-        const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
-        if (!row || !['held', 'challenged'].includes(row.status) || row.expiresAt <= new Date()) throw new Error('Hold cannot be confirmed');
-        const prior = await tx.dateHold.count({ where: { roomId: row.roomId, date: row.date, OR: [{ status: 'confirmed' }, { status: { in: ['held', 'challenged'] }, expiresAt: { gt: new Date() }, rank: { lt: row.rank } }] } });
-        if (prior) throw new Error('Earlier ranked hold must be released');
-        const title = String(input.title || '').trim();
-        if (!title) throw new Error('Event title required');
-        const chart = await tx.seatingChart.findUnique({ where: { id: input.seatingChartId } });
-        if (!chart || chart.roomId !== row.roomId || chart.status !== 'published') throw new Error('Published room configuration required');
-        if (input.ageRestriction && !['all_ages', '16', '18', '21'].includes(input.ageRestriction)) throw new Error('Unknown age restriction');
-        const room = await tx.room.findUnique({ where: { id: row.roomId } });
-        const day = row.date.toISOString().slice(0, 10);
-        const showAt = input.showTime ? zonedDateTime(day, input.showTime, room?.timezone || 'UTC') : new Date(input.showAt || row.date);
-        const doorsAt = input.doorsTime ? zonedDateTime(day, input.doorsTime, room?.timezone || 'UTC') : new Date(input.doorsAt || row.date);
-        if (Number.isNaN(+showAt) || Number.isNaN(+doorsAt) || doorsAt > showAt) throw new Error('Doors must open before the show');
-        const event = await tx.event.create({ data: { title, roomId: row.roomId, seatingChartId: chart.id, showAt, doorsAt, status: 'hold', promoterId: actor, ageRestriction: input.ageRestriction || 'all_ages' } });
-        await transition(tx, 'dateHold', row.id, row.status, 'confirmed', actor, '', { eventId: event.id });
-        if (row.artistId) await tx.eventArtist.create({ data: { eventId: event.id, artistId: row.artistId, billing: 'headliner', position: 1 } });
-        await audit('Event', event.id, { status: 'hold' }); return { id: row.id, eventId: event.id, status: 'confirmed' };
-      }
+      if (['placeDateHold', 'releaseDateHold', 'challengeHold', 'confirmHold'].includes(operation)) return runHoldCommand(operation, tx, input, actor);
       if (operation === 'declineOffer') {
         const offer = await tx.offer.findUnique({ where: { id: input.offerId } });
         if (!offer) throw new Error('Offer not found');

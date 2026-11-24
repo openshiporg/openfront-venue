@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { catalogAccessFor } from '../access';
 
 test('room/talent catalogs require their own permission, not event management', () => {
- for(const permission of ['canManageRooms','canManageArtists'] as const){
+ for(const permission of ['canManageRooms','canManageContacts'] as const){
   const access=catalogAccessFor(permission).operation;
   assert.equal(access.create({session:undefined}),false);
   assert.equal(access.update({session:{data:{role:{canManageEvents:true}}} as any}),false);

@@ -27,7 +27,8 @@ test('cancelling an event releases every active hold; expiry releases unpaid che
   assert.doesNotMatch(inv, /order: null/);
   const ops = readFileSync(new URL('../mutations/operators.ts', import.meta.url), 'utf8');
   assert.match(ops, /expireHolds\(tx, eventId, \{ all: true \}\)/);
-  assert.match(ops, /Hold expired', \{ rankKey: null \}/);
+  const cal = readFileSync(new URL('../mutations/calendar.ts', import.meta.url), 'utf8');
+  assert.match(cal, /'released', actor, reason, \{ rankKey: null, releasedReason: reason \}/);
 });
 test('a payment landing after the hold lapsed is refunded under a stable provider key', () => {
   const co = readFileSync(new URL('../mutations/checkout.ts', import.meta.url), 'utf8');

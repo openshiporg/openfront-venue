@@ -13,6 +13,8 @@ type User {
   onboardingStatus: String
   event_promoter(where: EventWhereInput! = {}, orderBy: [EventOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: EventWhereUniqueInput): [Event!]
   event_promoterCount(where: EventWhereInput! = {}): Int
+  inquiry_handledBy(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
+  inquiry_handledByCount(where: InquiryWhereInput! = {}): Int
   inventoryHold_customer(where: InventoryHoldWhereInput! = {}, orderBy: [InventoryHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InventoryHoldWhereUniqueInput): [InventoryHold!]
   inventoryHold_customerCount(where: InventoryHoldWhereInput! = {}): Int
   ticketOrder_customer(where: TicketOrderWhereInput! = {}, orderBy: [TicketOrderOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: TicketOrderWhereUniqueInput): [TicketOrder!]
@@ -54,6 +56,7 @@ input UserWhereInput {
   emailConfirmationSentAt: DateTimeNullableFilter
   onboardingStatus: StringNullableFilter
   event_promoter: EventManyRelationFilter
+  inquiry_handledBy: InquiryManyRelationFilter
   inventoryHold_customer: InventoryHoldManyRelationFilter
   ticketOrder_customer: TicketOrderManyRelationFilter
   scanEvent_scannedBy: ScanEventManyRelationFilter
@@ -144,6 +147,12 @@ input EventManyRelationFilter {
   none: EventWhereInput
 }
 
+input InquiryManyRelationFilter {
+  every: InquiryWhereInput
+  some: InquiryWhereInput
+  none: InquiryWhereInput
+}
+
 input InventoryHoldManyRelationFilter {
   every: InventoryHoldWhereInput
   some: InventoryHoldWhereInput
@@ -223,6 +232,7 @@ input UserUpdateInput {
   emailConfirmationSentAt: DateTime
   onboardingStatus: String
   event_promoter: EventRelateToManyForUpdateInput
+  inquiry_handledBy: InquiryRelateToManyForUpdateInput
   inventoryHold_customer: InventoryHoldRelateToManyForUpdateInput
   ticketOrder_customer: TicketOrderRelateToManyForUpdateInput
   scanEvent_scannedBy: ScanEventRelateToManyForUpdateInput
@@ -247,6 +257,13 @@ input EventRelateToManyForUpdateInput {
   set: [EventWhereUniqueInput!]
   create: [EventCreateInput!]
   connect: [EventWhereUniqueInput!]
+}
+
+input InquiryRelateToManyForUpdateInput {
+  disconnect: [InquiryWhereUniqueInput!]
+  set: [InquiryWhereUniqueInput!]
+  create: [InquiryCreateInput!]
+  connect: [InquiryWhereUniqueInput!]
 }
 
 input InventoryHoldRelateToManyForUpdateInput {
@@ -306,6 +323,7 @@ input UserCreateInput {
   emailConfirmationSentAt: DateTime
   onboardingStatus: String
   event_promoter: EventRelateToManyForCreateInput
+  inquiry_handledBy: InquiryRelateToManyForCreateInput
   inventoryHold_customer: InventoryHoldRelateToManyForCreateInput
   ticketOrder_customer: TicketOrderRelateToManyForCreateInput
   scanEvent_scannedBy: ScanEventRelateToManyForCreateInput
@@ -327,6 +345,11 @@ input RoleRelateToOneForCreateInput {
 input EventRelateToManyForCreateInput {
   create: [EventCreateInput!]
   connect: [EventWhereUniqueInput!]
+}
+
+input InquiryRelateToManyForCreateInput {
+  create: [InquiryCreateInput!]
+  connect: [InquiryWhereUniqueInput!]
 }
 
 input InventoryHoldRelateToManyForCreateInput {
@@ -380,7 +403,14 @@ type Role {
   canManageSettlements: Boolean
   canApproveAdjustments: Boolean
   canManageRooms: Boolean
-  canManageArtists: Boolean
+  canManageContacts: Boolean
+  canManageInquiries: Boolean
+  canManageVenueDeals: Boolean
+  canManageAdvance: Boolean
+  canManageStaff: Boolean
+  canManageInsurance: Boolean
+  canManageConnections: Boolean
+  canManagePrivateEvents: Boolean
   createdAt: DateTime
   updatedAt: DateTime
   assignedTo(where: UserWhereInput! = {}, orderBy: [UserOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: UserWhereUniqueInput): [User!]
@@ -415,7 +445,14 @@ input RoleWhereInput {
   canManageSettlements: BooleanFilter
   canApproveAdjustments: BooleanFilter
   canManageRooms: BooleanFilter
-  canManageArtists: BooleanFilter
+  canManageContacts: BooleanFilter
+  canManageInquiries: BooleanFilter
+  canManageVenueDeals: BooleanFilter
+  canManageAdvance: BooleanFilter
+  canManageStaff: BooleanFilter
+  canManageInsurance: BooleanFilter
+  canManageConnections: BooleanFilter
+  canManagePrivateEvents: BooleanFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
   assignedTo: UserManyRelationFilter
@@ -453,7 +490,14 @@ input RoleOrderByInput {
   canManageSettlements: OrderDirection
   canApproveAdjustments: OrderDirection
   canManageRooms: OrderDirection
-  canManageArtists: OrderDirection
+  canManageContacts: OrderDirection
+  canManageInquiries: OrderDirection
+  canManageVenueDeals: OrderDirection
+  canManageAdvance: OrderDirection
+  canManageStaff: OrderDirection
+  canManageInsurance: OrderDirection
+  canManageConnections: OrderDirection
+  canManagePrivateEvents: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
@@ -478,7 +522,14 @@ input RoleUpdateInput {
   canManageSettlements: Boolean
   canApproveAdjustments: Boolean
   canManageRooms: Boolean
-  canManageArtists: Boolean
+  canManageContacts: Boolean
+  canManageInquiries: Boolean
+  canManageVenueDeals: Boolean
+  canManageAdvance: Boolean
+  canManageStaff: Boolean
+  canManageInsurance: Boolean
+  canManageConnections: Boolean
+  canManagePrivateEvents: Boolean
   createdAt: DateTime
   updatedAt: DateTime
   assignedTo: UserRelateToManyForUpdateInput
@@ -516,7 +567,14 @@ input RoleCreateInput {
   canManageSettlements: Boolean
   canApproveAdjustments: Boolean
   canManageRooms: Boolean
-  canManageArtists: Boolean
+  canManageContacts: Boolean
+  canManageInquiries: Boolean
+  canManageVenueDeals: Boolean
+  canManageAdvance: Boolean
+  canManageStaff: Boolean
+  canManageInsurance: Boolean
+  canManageConnections: Boolean
+  canManagePrivateEvents: Boolean
   createdAt: DateTime
   updatedAt: DateTime
   assignedTo: UserRelateToManyForCreateInput
@@ -786,6 +844,8 @@ type Room {
   event_roomCount(where: EventWhereInput! = {}): Int
   dateHold_room(where: DateHoldWhereInput! = {}, orderBy: [DateHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DateHoldWhereUniqueInput): [DateHold!]
   dateHold_roomCount(where: DateHoldWhereInput! = {}): Int
+  inquiry_room(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
+  inquiry_roomCount(where: InquiryWhereInput! = {}): Int
   currencyCode: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -830,6 +890,7 @@ input RoomWhereInput {
   seatingChart_room: SeatingChartManyRelationFilter
   event_room: EventManyRelationFilter
   dateHold_room: DateHoldManyRelationFilter
+  inquiry_room: InquiryManyRelationFilter
   currencyCode: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
@@ -892,6 +953,7 @@ input RoomUpdateInput {
   seatingChart_room: SeatingChartRelateToManyForUpdateInput
   event_room: EventRelateToManyForUpdateInput
   dateHold_room: DateHoldRelateToManyForUpdateInput
+  inquiry_room: InquiryRelateToManyForUpdateInput
   currencyCode: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -939,6 +1001,7 @@ input RoomCreateInput {
   seatingChart_room: SeatingChartRelateToManyForCreateInput
   event_room: EventRelateToManyForCreateInput
   dateHold_room: DateHoldRelateToManyForCreateInput
+  inquiry_room: InquiryRelateToManyForCreateInput
   currencyCode: String
   createdAt: DateTime
   updatedAt: DateTime
@@ -1954,6 +2017,14 @@ type DateHold {
   date: DateTime
   expiresAt: DateTime
   status: String
+  kind: String
+  challengeDeadline: DateTime
+  challengedBy: DateHold
+  challenges(where: DateHoldWhereInput! = {}, orderBy: [DateHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DateHoldWhereUniqueInput): [DateHold!]
+  challengesCount(where: DateHoldWhereInput! = {}): Int
+  notes: String
+  releasedReason: String
+  promoter: Promoter
   room: Room
   artist: Artist
   agency: Agency
@@ -1977,6 +2048,13 @@ input DateHoldWhereInput {
   date: DateTimeNullableFilter
   expiresAt: DateTimeNullableFilter
   status: StringNullableFilter
+  kind: StringFilter
+  challengeDeadline: DateTimeNullableFilter
+  challengedBy: DateHoldWhereInput
+  challenges: DateHoldManyRelationFilter
+  notes: StringFilter
+  releasedReason: StringFilter
+  promoter: PromoterWhereInput
   room: RoomWhereInput
   artist: ArtistWhereInput
   agency: AgencyWhereInput
@@ -1992,6 +2070,10 @@ input DateHoldOrderByInput {
   date: OrderDirection
   expiresAt: OrderDirection
   status: OrderDirection
+  kind: OrderDirection
+  challengeDeadline: OrderDirection
+  notes: OrderDirection
+  releasedReason: OrderDirection
   createdAt: OrderDirection
   updatedAt: OrderDirection
 }
@@ -2002,12 +2084,31 @@ input DateHoldUpdateInput {
   date: DateTime
   expiresAt: DateTime
   status: String
+  kind: String
+  challengeDeadline: DateTime
+  challengedBy: DateHoldRelateToOneForUpdateInput
+  challenges: DateHoldRelateToManyForUpdateInput
+  notes: String
+  releasedReason: String
+  promoter: PromoterRelateToOneForUpdateInput
   room: RoomRelateToOneForUpdateInput
   artist: ArtistRelateToOneForUpdateInput
   agency: AgencyRelateToOneForUpdateInput
   event: EventRelateToOneForUpdateInput
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+input DateHoldRelateToOneForUpdateInput {
+  create: DateHoldCreateInput
+  connect: DateHoldWhereUniqueInput
+  disconnect: Boolean
+}
+
+input PromoterRelateToOneForUpdateInput {
+  create: PromoterCreateInput
+  connect: PromoterWhereUniqueInput
+  disconnect: Boolean
 }
 
 input DateHoldUpdateArgs {
@@ -2021,10 +2122,229 @@ input DateHoldCreateInput {
   date: DateTime
   expiresAt: DateTime
   status: String
+  kind: String
+  challengeDeadline: DateTime
+  challengedBy: DateHoldRelateToOneForCreateInput
+  challenges: DateHoldRelateToManyForCreateInput
+  notes: String
+  releasedReason: String
+  promoter: PromoterRelateToOneForCreateInput
   room: RoomRelateToOneForCreateInput
   artist: ArtistRelateToOneForCreateInput
   agency: AgencyRelateToOneForCreateInput
   event: EventRelateToOneForCreateInput
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input DateHoldRelateToOneForCreateInput {
+  create: DateHoldCreateInput
+  connect: DateHoldWhereUniqueInput
+}
+
+input PromoterRelateToOneForCreateInput {
+  create: PromoterCreateInput
+  connect: PromoterWhereUniqueInput
+}
+
+type Promoter {
+  id: ID!
+  company: String
+  contactName: String
+  email: String
+  phone: String
+  website: String
+  notes: String
+  dateHold_promoter(where: DateHoldWhereInput! = {}, orderBy: [DateHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DateHoldWhereUniqueInput): [DateHold!]
+  dateHold_promoterCount(where: DateHoldWhereInput! = {}): Int
+  inquiry_promoter(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
+  inquiry_promoterCount(where: InquiryWhereInput! = {}): Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PromoterWhereUniqueInput {
+  id: ID
+}
+
+input PromoterWhereInput {
+  AND: [PromoterWhereInput!]
+  OR: [PromoterWhereInput!]
+  NOT: [PromoterWhereInput!]
+  id: IDFilter
+  company: StringFilter
+  contactName: StringFilter
+  email: StringFilter
+  phone: StringFilter
+  website: StringFilter
+  notes: StringFilter
+  dateHold_promoter: DateHoldManyRelationFilter
+  inquiry_promoter: InquiryManyRelationFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input PromoterOrderByInput {
+  id: OrderDirection
+  company: OrderDirection
+  contactName: OrderDirection
+  email: OrderDirection
+  phone: OrderDirection
+  website: OrderDirection
+  notes: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input PromoterUpdateInput {
+  company: String
+  contactName: String
+  email: String
+  phone: String
+  website: String
+  notes: String
+  dateHold_promoter: DateHoldRelateToManyForUpdateInput
+  inquiry_promoter: InquiryRelateToManyForUpdateInput
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input PromoterUpdateArgs {
+  where: PromoterWhereUniqueInput!
+  data: PromoterUpdateInput!
+}
+
+input PromoterCreateInput {
+  company: String
+  contactName: String
+  email: String
+  phone: String
+  website: String
+  notes: String
+  dateHold_promoter: DateHoldRelateToManyForCreateInput
+  inquiry_promoter: InquiryRelateToManyForCreateInput
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type Inquiry {
+  id: ID!
+  kind: String
+  name: String
+  email: String
+  phone: String
+  company: String
+  dateWanted: DateTime
+  flexibleDates: Boolean
+  room: Room
+  guests: Int
+  eventType: String
+  budgetCents: Int
+  message: String
+  status: String
+  lostReason: String
+  source: String
+  promoter: Promoter
+  handledBy: User
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input InquiryWhereUniqueInput {
+  id: ID
+}
+
+input InquiryWhereInput {
+  AND: [InquiryWhereInput!]
+  OR: [InquiryWhereInput!]
+  NOT: [InquiryWhereInput!]
+  id: IDFilter
+  kind: StringFilter
+  name: StringFilter
+  email: StringFilter
+  phone: StringFilter
+  company: StringFilter
+  dateWanted: DateTimeNullableFilter
+  flexibleDates: BooleanFilter
+  room: RoomWhereInput
+  guests: IntNullableFilter
+  eventType: StringFilter
+  budgetCents: IntNullableFilter
+  message: StringFilter
+  status: StringNullableFilter
+  lostReason: StringFilter
+  source: StringFilter
+  promoter: PromoterWhereInput
+  handledBy: UserWhereInput
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+}
+
+input InquiryOrderByInput {
+  id: OrderDirection
+  kind: OrderDirection
+  name: OrderDirection
+  email: OrderDirection
+  phone: OrderDirection
+  company: OrderDirection
+  dateWanted: OrderDirection
+  flexibleDates: OrderDirection
+  guests: OrderDirection
+  eventType: OrderDirection
+  budgetCents: OrderDirection
+  message: OrderDirection
+  status: OrderDirection
+  lostReason: OrderDirection
+  source: OrderDirection
+  createdAt: OrderDirection
+  updatedAt: OrderDirection
+}
+
+input InquiryUpdateInput {
+  kind: String
+  name: String
+  email: String
+  phone: String
+  company: String
+  dateWanted: DateTime
+  flexibleDates: Boolean
+  room: RoomRelateToOneForUpdateInput
+  guests: Int
+  eventType: String
+  budgetCents: Int
+  message: String
+  status: String
+  lostReason: String
+  source: String
+  promoter: PromoterRelateToOneForUpdateInput
+  handledBy: UserRelateToOneForUpdateInput
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input InquiryUpdateArgs {
+  where: InquiryWhereUniqueInput!
+  data: InquiryUpdateInput!
+}
+
+input InquiryCreateInput {
+  kind: String
+  name: String
+  email: String
+  phone: String
+  company: String
+  dateWanted: DateTime
+  flexibleDates: Boolean
+  room: RoomRelateToOneForCreateInput
+  guests: Int
+  eventType: String
+  budgetCents: Int
+  message: String
+  status: String
+  lostReason: String
+  source: String
+  promoter: PromoterRelateToOneForCreateInput
+  handledBy: UserRelateToOneForCreateInput
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -4155,6 +4475,9 @@ type StoreSettings {
   supportPhone: String
   refundPolicy: String
   currencyCode: String
+  challengeBusinessDays: Int
+  challengeCountsWeekends: Boolean
+  holdExpiryDays: Int
   logoIcon: String
   logoColor: String
   createdAt: DateTime
@@ -4177,6 +4500,9 @@ input StoreSettingsWhereInput {
   supportPhone: StringFilter
   refundPolicy: StringFilter
   currencyCode: StringFilter
+  challengeBusinessDays: IntNullableFilter
+  challengeCountsWeekends: BooleanFilter
+  holdExpiryDays: IntNullableFilter
   logoIcon: StringFilter
   logoColor: StringFilter
   createdAt: DateTimeFilter
@@ -4191,6 +4517,9 @@ input StoreSettingsOrderByInput {
   supportPhone: OrderDirection
   refundPolicy: OrderDirection
   currencyCode: OrderDirection
+  challengeBusinessDays: OrderDirection
+  challengeCountsWeekends: OrderDirection
+  holdExpiryDays: OrderDirection
   logoIcon: OrderDirection
   logoColor: OrderDirection
   createdAt: OrderDirection
@@ -4205,6 +4534,9 @@ input StoreSettingsUpdateInput {
   supportPhone: String
   refundPolicy: String
   currencyCode: String
+  challengeBusinessDays: Int
+  challengeCountsWeekends: Boolean
+  holdExpiryDays: Int
   logoIcon: String
   logoColor: String
   createdAt: DateTime
@@ -4224,6 +4556,9 @@ input StoreSettingsCreateInput {
   supportPhone: String
   refundPolicy: String
   currencyCode: String
+  challengeBusinessDays: Int
+  challengeCountsWeekends: Boolean
+  holdExpiryDays: Int
   logoIcon: String
   logoColor: String
   createdAt: DateTime
@@ -5267,6 +5602,18 @@ type Mutation {
   updateDateHolds(data: [DateHoldUpdateArgs!]!): [DateHold]
   deleteDateHold(where: DateHoldWhereUniqueInput!): DateHold
   deleteDateHolds(where: [DateHoldWhereUniqueInput!]!): [DateHold]
+  createPromoter(data: PromoterCreateInput!): Promoter
+  createPromoters(data: [PromoterCreateInput!]!): [Promoter]
+  updatePromoter(where: PromoterWhereUniqueInput!, data: PromoterUpdateInput!): Promoter
+  updatePromoters(data: [PromoterUpdateArgs!]!): [Promoter]
+  deletePromoter(where: PromoterWhereUniqueInput!): Promoter
+  deletePromoters(where: [PromoterWhereUniqueInput!]!): [Promoter]
+  createInquiry(data: InquiryCreateInput!): Inquiry
+  createInquiries(data: [InquiryCreateInput!]!): [Inquiry]
+  updateInquiry(where: InquiryWhereUniqueInput!, data: InquiryUpdateInput!): Inquiry
+  updateInquiries(data: [InquiryUpdateArgs!]!): [Inquiry]
+  deleteInquiry(where: InquiryWhereUniqueInput!): Inquiry
+  deleteInquiries(where: [InquiryWhereUniqueInput!]!): [Inquiry]
   createOffer(data: OfferCreateInput!): Offer
   createOffers(data: [OfferCreateInput!]!): [Offer]
   updateOffer(where: OfferWhereUniqueInput!, data: OfferUpdateInput!): Offer
@@ -5455,6 +5802,8 @@ type Mutation {
   retryTicketRefund(input: RetryTicketRefundInput!): JSON
   resendOrderConfirmation(orderId: ID!): JSON
   setRecordHidden(list: String!, id: ID!, hidden: Boolean!, reason: String): JSON
+  submitInquiry(input: JSON!): JSON
+  workInquiry(input: JSON!): JSON
   sendEmailConfirmation: JSON
   confirmCustomerEmail(userId: ID!, proof: String!): JSON
   updateActiveUser(data: UserUpdateProfileInput!): User
@@ -5567,6 +5916,12 @@ type Query {
   dateHold(where: DateHoldWhereUniqueInput!): DateHold
   dateHolds(where: DateHoldWhereInput! = {}, orderBy: [DateHoldOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: DateHoldWhereUniqueInput): [DateHold!]
   dateHoldsCount(where: DateHoldWhereInput! = {}): Int
+  promoter(where: PromoterWhereUniqueInput!): Promoter
+  promoters(where: PromoterWhereInput! = {}, orderBy: [PromoterOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: PromoterWhereUniqueInput): [Promoter!]
+  promotersCount(where: PromoterWhereInput! = {}): Int
+  inquiry(where: InquiryWhereUniqueInput!): Inquiry
+  inquiries(where: InquiryWhereInput! = {}, orderBy: [InquiryOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: InquiryWhereUniqueInput): [Inquiry!]
+  inquiriesCount(where: InquiryWhereInput! = {}): Int
   offer(where: OfferWhereUniqueInput!): Offer
   offers(where: OfferWhereInput! = {}, orderBy: [OfferOrderByInput!]! = [], take: Int, skip: Int! = 0, cursor: OfferWhereUniqueInput): [Offer!]
   offersCount(where: OfferWhereInput! = {}): Int
@@ -5663,6 +6018,7 @@ type Query {
   lookupTicketOrder(email: String!, orderNumber: String!): JSON
   ticketOrderView(orderId: ID!, proof: String): JSON
   myTicketOrders: JSON
+  roomAvailability(roomId: ID!, from: String, days: Int): JSON
   storeLogo: StoreLogo!
 }
 
@@ -5814,6 +6170,9 @@ input OperatorCommandInput {
   agencyId: ID
   expiresAt: String
   holdId: ID
+  byHoldId: ID
+  promoterId: ID
+  notes: String
   phaseId: ID
   expenseId: ID
   data: JSON

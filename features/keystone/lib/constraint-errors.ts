@@ -5,7 +5,7 @@ const AMOUNT = 'VENUE_INVALID_AMOUNT'
 const CURRENCY = { code: 'VENUE_INVALID_CURRENCY', message: 'Currency must be a three-letter code, such as USD.' }
 const TIME = 'VENUE_INVALID_TIME_RANGE'
 
-/** Database rules (migrations/20261124022500_venue_invariants) and what a person should read when one refuses a write. */
+/** Database rules (migrations/*_venue_invariants and later migrations that add rules) and what a person should read when one refuses a write. */
 export const CONSTRAINT_MESSAGES: Record<string, Rule> = {
   PriceLevel_counts_valid: { code: 'VENUE_CAPACITY_EXCEEDED', message: 'Sold, held and blocked tickets can’t exceed a price level’s capacity.' },
   PriceLevel_amounts_valid: { code: AMOUNT, message: 'Ticket price and fees can’t be negative, and an order must allow at least one ticket.' },
@@ -60,6 +60,10 @@ export const CONSTRAINT_MESSAGES: Record<string, Rule> = {
   ScanEvent_one_admission_per_ticket: { code: 'VENUE_DUPLICATE_ADMISSION', message: 'That ticket has already been admitted.', fields: ['ticket'] },
   Seat_chartSection_row_number_key: { code: 'VENUE_DUPLICATE_SEAT', message: 'That seat already exists in this section.', fields: ['chartSection', 'row', 'number'] },
   Agency_name_key: { code: 'VENUE_DUPLICATE_NAME', message: 'An agency with that name already exists.', fields: ['name'] },
+  DateHold_one_confirmed_per_day: { code: 'VENUE_DATE_TAKEN', message: 'That room already has a confirmed booking on this date.', fields: ['date'] },
+  venue_inquiry_status: { code: 'VENUE_INVALID_STATUS', message: 'That inquiry status is not recognised.' },
+  venue_inquiry_kind: { code: 'VENUE_INVALID_STATUS', message: 'An inquiry is for a show or a private event.' },
+  venue_datehold_kind: { code: 'VENUE_INVALID_STATUS', message: 'A hold is for a show, a rental, a private event or the house.' },
   Room_name_city_key: { code: 'VENUE_DUPLICATE_NAME', message: 'A room with that name already exists in that city.', fields: ['city', 'name'] },
 }
 

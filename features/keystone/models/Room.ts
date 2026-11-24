@@ -23,6 +23,7 @@ export const Room = list({
   seatingChart_room: relationship({ ref: 'SeatingChart.room', many: true }),
   event_room: relationship({ ref: 'Event.room', many: true }),
   dateHold_room: relationship({ ref: 'DateHold.room', many: true }),
+  inquiry_room: relationship({ ref: 'Inquiry.room', many: true }),
   currencyCode: text({ defaultValue: 'USD', validation: { match: { regex: /^[A-Z]{3}$/, explanation: 'ISO 4217 currency code' } } }),
   ...trackingFields,
  }

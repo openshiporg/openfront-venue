@@ -13,7 +13,7 @@ const PrismaModule = { PrismaClient, Prisma: { DbNull: null, JsonNull: null } };
 const base = getContext(config as any, PrismaModule);
 
 const roles: Record<string, string[]> = {
-  'Booker': ['canAccessDashboard', 'canManageEvents', 'canManageDeals', 'canManageRooms', 'canManageArtists', 'canManageInventory'],
+  'Booker': ['canAccessDashboard', 'canManageEvents', 'canManageDeals', 'canManageRooms', 'canManageContacts', 'canManageInventory'],
   'Box Office': ['canAccessDashboard', 'canManageOrders', 'canIssueRefunds', 'canScanTickets'],
   'Door Staff': ['canAccessDashboard', 'canScanTickets'],
   'Settlement Manager': ['canAccessDashboard', 'canManageSettlements', 'canApproveAdjustments', 'canReadAudit', 'canReadPayments'],

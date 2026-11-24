@@ -187,7 +187,7 @@ module.exports = __toCommonJS(keystone_exports);
 
 // features/keystone/index.ts
 var import_auth = require("@keystone-6/auth");
-var import_core46 = require("@keystone-6/core");
+var import_core48 = require("@keystone-6/core");
 var import_config = require("dotenv/config");
 
 // features/keystone/models/User.ts
@@ -239,7 +239,14 @@ var permissionNames = [
   "canManageSettlements",
   "canApproveAdjustments",
   "canManageRooms",
-  "canManageArtists"
+  "canManageContacts",
+  "canManageInquiries",
+  "canManageVenueDeals",
+  "canManageAdvance",
+  "canManageStaff",
+  "canManageInsurance",
+  "canManageConnections",
+  "canManagePrivateEvents"
 ];
 var isSignedIn = ({ session }) => Boolean(session);
 var permissions = Object.fromEntries(permissionNames.map((name2) => [name2, ({ session }) => session?.data.role?.[name2] === true]));
@@ -262,7 +269,14 @@ var permissionActions = {
   canManageSettlements: "manage settlements",
   canApproveAdjustments: "approve adjustments",
   canManageRooms: "manage rooms",
-  canManageArtists: "manage artists"
+  canManageContacts: "manage contacts",
+  canManageInquiries: "manage inquiries",
+  canManageVenueDeals: "manage venue deals",
+  canManageAdvance: "advance shows",
+  canManageStaff: "manage staff and shifts",
+  canManageInsurance: "manage insurance certificates",
+  canManageConnections: "manage connections",
+  canManagePrivateEvents: "manage private events"
 };
 var permissionRefusal = (permission) => `Your role does not allow you to ${permissionActions[permission]}.`;
 var commandAccess = { operation: { query: permissions.canAccessDashboard, create: () => false, update: () => false, delete: () => false } };
@@ -358,6 +372,7 @@ var User = (0, import_core.list)({
     // Public sign-up cannot attach orders, holds or settings to the new account; checkout and email confirmation do that.
     ...relationsManagedBy({
       event_promoter: "Event.promoter",
+      inquiry_handledBy: "Inquiry.handledBy",
       inventoryHold_customer: "InventoryHold.customer",
       ticketOrder_customer: "TicketOrder.customer",
       scanEvent_scannedBy: "ScanEvent.scannedBy",
@@ -706,6 +721,7 @@ var Room = (0, import_core7.list)({
     seatingChart_room: (0, import_fields6.relationship)({ ref: "SeatingChart.room", many: true }),
     event_room: (0, import_fields6.relationship)({ ref: "Event.room", many: true }),
     dateHold_room: (0, import_fields6.relationship)({ ref: "DateHold.room", many: true }),
+    inquiry_room: (0, import_fields6.relationship)({ ref: "Inquiry.room", many: true }),
     currencyCode: (0, import_fields6.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
@@ -801,7 +817,7 @@ var Seat = (0, import_core10.list)({
 var import_core11 = require("@keystone-6/core");
 var import_fields10 = require("@keystone-6/core/fields");
 var Agency = (0, import_core11.list)({
-  access: catalogAccessFor("canManageArtists"),
+  access: catalogAccessFor("canManageContacts"),
   fields: {
     name: (0, import_fields10.text)({}),
     contacts: (0, import_fields10.json)(),
@@ -815,7 +831,7 @@ var Agency = (0, import_core11.list)({
 var import_core12 = require("@keystone-6/core");
 var import_fields11 = require("@keystone-6/core/fields");
 var Artist = (0, import_core12.list)({
-  access: catalogAccessFor("canManageArtists"),
+  access: catalogAccessFor("canManageContacts"),
   fields: {
     name: (0, import_fields11.text)({}),
     genreTags: (0, import_fields11.text)({}),
@@ -924,7 +940,14 @@ var DateHold = (0, import_core15.list)({
     rank: (0, import_fields14.integer)({ defaultValue: 0 }),
     date: (0, import_fields14.timestamp)(),
     expiresAt: (0, import_fields14.timestamp)(),
-    status: (0, import_fields14.select)({ type: "string", options: ["held", "challenged", "confirmed", "released"], defaultValue: "held", access: { update: () => false } }),
+    status: (0, import_fields14.select)({ type: "string", options: ["held", "challenged", "confirmed", "released"], defaultValue: "held", access: { create: () => false, update: () => false } }),
+    kind: (0, import_fields14.select)({ type: "string", options: ["show", "rental", "private_event", "internal"], defaultValue: "show", validation: { isRequired: true }, access: { update: () => false } }),
+    challengeDeadline: (0, import_fields14.timestamp)({ access: { create: () => false, update: () => false } }),
+    challengedBy: (0, import_fields14.relationship)({ ref: "DateHold.challenges", many: false }),
+    challenges: (0, import_fields14.relationship)({ ref: "DateHold.challengedBy", many: true }),
+    notes: (0, import_fields14.text)({ ui: { displayMode: "textarea" } }),
+    releasedReason: (0, import_fields14.text)({ access: { create: () => false, update: () => false } }),
+    promoter: (0, import_fields14.relationship)({ ref: "Promoter.dateHold_promoter", many: false }),
     room: (0, import_fields14.relationship)({ ref: "Room.dateHold_room", many: false }),
     artist: (0, import_fields14.relationship)({ ref: "Artist.dateHold_artist", many: false }),
     agency: (0, import_fields14.relationship)({ ref: "Agency.dateHold_agency", many: false }),
@@ -933,446 +956,491 @@ var DateHold = (0, import_core15.list)({
   }
 });
 
-// features/keystone/models/Offer.ts
+// features/keystone/models/Promoter.ts
 var import_core16 = require("@keystone-6/core");
 var import_fields15 = require("@keystone-6/core/fields");
-var Offer = (0, import_core16.list)({
-  access: { operation: { ...catalogAccess.operation, query: readAccess("canManageDeals", "canManageSettlements").operation.query } },
+var Promoter = (0, import_core16.list)({
+  access: catalogAccessFor("canManageContacts"),
   fields: {
-    breakevenBasis: (0, import_fields15.text)({}),
-    radiusClause: (0, import_fields15.text)({}),
-    notes: (0, import_fields15.text)({}),
-    acceptedTermsHash: (0, import_fields15.text)({}),
-    version: (0, import_fields15.integer)({ defaultValue: 1 }),
-    guaranteeCents: (0, import_fields15.integer)({ defaultValue: 0 }),
-    percentageBps: (0, import_fields15.integer)({ defaultValue: 0 }),
-    promoterProfitBps: (0, import_fields15.integer)({ defaultValue: 0 }),
-    expenseCapCents: (0, import_fields15.integer)({ defaultValue: 0 }),
-    merchSplitBps: (0, import_fields15.integer)({ defaultValue: 0 }),
-    hardMerchSplitBps: (0, import_fields15.integer)({ defaultValue: 0 }),
-    hospitalityRiderCents: (0, import_fields15.integer)({ defaultValue: 0 }),
-    depositCents: (0, import_fields15.integer)({ defaultValue: 0 }),
-    acceptedTerms: (0, import_fields15.json)(),
-    depositDueAt: (0, import_fields15.timestamp)(),
-    status: (0, import_fields15.select)({ type: "string", options: ["draft", "sent", "accepted", "declined", "contracted", "settled", "superseded"], defaultValue: "draft", access: { update: () => false } }),
-    dealType: (0, import_fields15.select)({ type: "string", options: ["flat_guarantee", "versus", "plus", "door_deal"], defaultValue: "flat_guarantee", access: { update: () => false } }),
-    event: (0, import_fields15.relationship)({ ref: "Event.offer_event", many: false }),
-    artist: (0, import_fields15.relationship)({ ref: "Artist.offer_artist", many: false }),
-    eventArtist: (0, import_fields15.relationship)({ ref: "EventArtist.offer_eventArtist", many: false }),
-    currencyCode: (0, import_fields15.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    company: (0, import_fields15.text)({ validation: { isRequired: true } }),
+    contactName: (0, import_fields15.text)({}),
+    email: (0, import_fields15.text)({ validation: { match: { regex: /^$|^[^@\s]+@[^@\s]+\.[^@\s]+$/, explanation: "Enter an email address" } } }),
+    phone: (0, import_fields15.text)({}),
+    website: (0, import_fields15.text)({}),
+    notes: (0, import_fields15.text)({ ui: { displayMode: "textarea" } }),
+    dateHold_promoter: (0, import_fields15.relationship)({ ref: "DateHold.promoter", many: true }),
+    inquiry_promoter: (0, import_fields15.relationship)({ ref: "Inquiry.promoter", many: true }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/EventExpense.ts
+// features/keystone/models/Inquiry.ts
 var import_core17 = require("@keystone-6/core");
 var import_fields16 = require("@keystone-6/core/fields");
-var EventExpense = (0, import_core17.list)({
-  access: { operation: { ...catalogAccess.operation, query: readAccess("canManageEvents", "canManageSettlements").operation.query } },
+var Inquiry = (0, import_core17.list)({
+  access: { operation: { query: permissions.canManageInquiries, create: () => false, update: () => false, delete: () => false } },
   fields: {
-    vendor: (0, import_fields16.text)({}),
-    receipt: (0, import_fields16.text)({ access: { read: () => false, create: () => false, update: () => false } }),
-    notes: (0, import_fields16.text)({}),
-    budgetCents: (0, import_fields16.integer)({ defaultValue: 0 }),
-    actualCents: (0, import_fields16.integer)({ defaultValue: 0 }),
-    isCapped: (0, import_fields16.checkbox)({ defaultValue: false }),
-    category: (0, import_fields16.select)({ type: "string", options: ["venue_rent", "production", "security", "stagehands", "marketing", "catering", "insurance", "ticketing", "other"], defaultValue: "venue_rent", access: { update: () => false } }),
-    event: (0, import_fields16.relationship)({ ref: "Event.eventExpense_event", many: false }),
-    currencyCode: (0, import_fields16.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    kind: (0, import_fields16.select)({ type: "string", options: ["show", "private_event"], defaultValue: "show", validation: { isRequired: true }, access: { update: () => false } }),
+    name: (0, import_fields16.text)({ validation: { isRequired: true } }),
+    email: (0, import_fields16.text)({ validation: { isRequired: true } }),
+    phone: (0, import_fields16.text)({}),
+    company: (0, import_fields16.text)({}),
+    dateWanted: (0, import_fields16.timestamp)({}),
+    flexibleDates: (0, import_fields16.checkbox)({ defaultValue: false }),
+    room: (0, import_fields16.relationship)({ ref: "Room.inquiry_room", many: false }),
+    guests: (0, import_fields16.integer)({}),
+    eventType: (0, import_fields16.text)({}),
+    budgetCents: (0, import_fields16.integer)({}),
+    message: (0, import_fields16.text)({ ui: { displayMode: "textarea" } }),
+    status: (0, import_fields16.select)({ type: "string", options: ["new", "in_progress", "won", "lost"], defaultValue: "new", access: { update: () => false } }),
+    lostReason: (0, import_fields16.text)({}),
+    source: (0, import_fields16.text)({}),
+    promoter: (0, import_fields16.relationship)({ ref: "Promoter.inquiry_promoter", many: false }),
+    handledBy: (0, import_fields16.relationship)({ ref: "User.inquiry_handledBy", many: false }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/PriceLevel.ts
+// features/keystone/models/Offer.ts
 var import_core18 = require("@keystone-6/core");
 var import_fields17 = require("@keystone-6/core/fields");
-var PriceLevel = (0, import_core18.list)({
-  access: catalogAccess,
+var Offer = (0, import_core18.list)({
+  access: { operation: { ...catalogAccess.operation, query: readAccess("canManageDeals", "canManageSettlements").operation.query } },
   fields: {
-    name: (0, import_fields17.text)({}),
-    priceCents: (0, import_fields17.integer)({ defaultValue: 0 }),
-    feeCents: (0, import_fields17.integer)({ defaultValue: 0 }),
-    facilityFeeCents: (0, import_fields17.integer)({ defaultValue: 0 }),
-    capacity: (0, import_fields17.integer)({ defaultValue: 0 }),
-    sold: (0, import_fields17.integer)({ defaultValue: 0 }),
-    held: (0, import_fields17.integer)({ defaultValue: 0 }),
-    perOrderLimit: (0, import_fields17.integer)({ defaultValue: 8 }),
-    productionHeld: (0, import_fields17.integer)({ defaultValue: 0 }),
-    salesStartAt: (0, import_fields17.timestamp)(),
-    salesEndAt: (0, import_fields17.timestamp)(),
-    status: (0, import_fields17.select)({ type: "string", options: ["active", "paused", "closed"], defaultValue: "active", access: { update: () => false } }),
-    event: (0, import_fields17.relationship)({ ref: "Event.priceLevel_event", many: false }),
-    sections: (0, import_fields17.relationship)({ ref: "ChartSection.priceLevel_sections", many: true }),
-    priceLevelPhase_priceLevel: (0, import_fields17.relationship)({ ref: "PriceLevelPhase.priceLevel", many: true }),
-    seatInventory_priceLevel: (0, import_fields17.relationship)({ ref: "SeatInventory.priceLevel", many: true }),
-    productionHold_priceLevel: (0, import_fields17.relationship)({ ref: "ProductionHold.priceLevel", many: true }),
-    inventoryHold_priceLevel: (0, import_fields17.relationship)({ ref: "InventoryHold.priceLevel", many: true }),
-    promoCode_priceLevels: (0, import_fields17.relationship)({ ref: "PromoCode.priceLevels", many: true }),
-    ticketOrderLine_priceLevel: (0, import_fields17.relationship)({ ref: "TicketOrderLine.priceLevel", many: true }),
+    breakevenBasis: (0, import_fields17.text)({}),
+    radiusClause: (0, import_fields17.text)({}),
+    notes: (0, import_fields17.text)({}),
+    acceptedTermsHash: (0, import_fields17.text)({}),
+    version: (0, import_fields17.integer)({ defaultValue: 1 }),
+    guaranteeCents: (0, import_fields17.integer)({ defaultValue: 0 }),
+    percentageBps: (0, import_fields17.integer)({ defaultValue: 0 }),
+    promoterProfitBps: (0, import_fields17.integer)({ defaultValue: 0 }),
+    expenseCapCents: (0, import_fields17.integer)({ defaultValue: 0 }),
+    merchSplitBps: (0, import_fields17.integer)({ defaultValue: 0 }),
+    hardMerchSplitBps: (0, import_fields17.integer)({ defaultValue: 0 }),
+    hospitalityRiderCents: (0, import_fields17.integer)({ defaultValue: 0 }),
+    depositCents: (0, import_fields17.integer)({ defaultValue: 0 }),
+    acceptedTerms: (0, import_fields17.json)(),
+    depositDueAt: (0, import_fields17.timestamp)(),
+    status: (0, import_fields17.select)({ type: "string", options: ["draft", "sent", "accepted", "declined", "contracted", "settled", "superseded"], defaultValue: "draft", access: { update: () => false } }),
+    dealType: (0, import_fields17.select)({ type: "string", options: ["flat_guarantee", "versus", "plus", "door_deal"], defaultValue: "flat_guarantee", access: { update: () => false } }),
+    event: (0, import_fields17.relationship)({ ref: "Event.offer_event", many: false }),
+    artist: (0, import_fields17.relationship)({ ref: "Artist.offer_artist", many: false }),
+    eventArtist: (0, import_fields17.relationship)({ ref: "EventArtist.offer_eventArtist", many: false }),
     currencyCode: (0, import_fields17.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/PriceLevelPhase.ts
+// features/keystone/models/EventExpense.ts
 var import_core19 = require("@keystone-6/core");
 var import_fields18 = require("@keystone-6/core/fields");
-var PriceLevelPhase = (0, import_core19.list)({
-  access: catalogAccess,
+var EventExpense = (0, import_core19.list)({
+  access: { operation: { ...catalogAccess.operation, query: readAccess("canManageEvents", "canManageSettlements").operation.query } },
   fields: {
-    name: (0, import_fields18.text)({}),
-    priceCents: (0, import_fields18.integer)({ defaultValue: 0 }),
-    quantity: (0, import_fields18.integer)({ defaultValue: 0 }),
-    sold: (0, import_fields18.integer)({ defaultValue: 0 }),
-    sort: (0, import_fields18.integer)({ defaultValue: 0 }),
-    startsAt: (0, import_fields18.timestamp)(),
-    priceLevel: (0, import_fields18.relationship)({ ref: "PriceLevel.priceLevelPhase_priceLevel", many: false }),
-    inventoryHold_phase: (0, import_fields18.relationship)({ ref: "InventoryHold.phase", many: true }),
-    ticketOrderLine_phase: (0, import_fields18.relationship)({ ref: "TicketOrderLine.phase", many: true }),
+    vendor: (0, import_fields18.text)({}),
+    receipt: (0, import_fields18.text)({ access: { read: () => false, create: () => false, update: () => false } }),
+    notes: (0, import_fields18.text)({}),
+    budgetCents: (0, import_fields18.integer)({ defaultValue: 0 }),
+    actualCents: (0, import_fields18.integer)({ defaultValue: 0 }),
+    isCapped: (0, import_fields18.checkbox)({ defaultValue: false }),
+    category: (0, import_fields18.select)({ type: "string", options: ["venue_rent", "production", "security", "stagehands", "marketing", "catering", "insurance", "ticketing", "other"], defaultValue: "venue_rent", access: { update: () => false } }),
+    event: (0, import_fields18.relationship)({ ref: "Event.eventExpense_event", many: false }),
     currencyCode: (0, import_fields18.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/SeatInventory.ts
+// features/keystone/models/PriceLevel.ts
 var import_core20 = require("@keystone-6/core");
 var import_fields19 = require("@keystone-6/core/fields");
-var SeatInventory = (0, import_core20.list)({
+var PriceLevel = (0, import_core20.list)({
+  access: catalogAccess,
+  fields: {
+    name: (0, import_fields19.text)({}),
+    priceCents: (0, import_fields19.integer)({ defaultValue: 0 }),
+    feeCents: (0, import_fields19.integer)({ defaultValue: 0 }),
+    facilityFeeCents: (0, import_fields19.integer)({ defaultValue: 0 }),
+    capacity: (0, import_fields19.integer)({ defaultValue: 0 }),
+    sold: (0, import_fields19.integer)({ defaultValue: 0 }),
+    held: (0, import_fields19.integer)({ defaultValue: 0 }),
+    perOrderLimit: (0, import_fields19.integer)({ defaultValue: 8 }),
+    productionHeld: (0, import_fields19.integer)({ defaultValue: 0 }),
+    salesStartAt: (0, import_fields19.timestamp)(),
+    salesEndAt: (0, import_fields19.timestamp)(),
+    status: (0, import_fields19.select)({ type: "string", options: ["active", "paused", "closed"], defaultValue: "active", access: { update: () => false } }),
+    event: (0, import_fields19.relationship)({ ref: "Event.priceLevel_event", many: false }),
+    sections: (0, import_fields19.relationship)({ ref: "ChartSection.priceLevel_sections", many: true }),
+    priceLevelPhase_priceLevel: (0, import_fields19.relationship)({ ref: "PriceLevelPhase.priceLevel", many: true }),
+    seatInventory_priceLevel: (0, import_fields19.relationship)({ ref: "SeatInventory.priceLevel", many: true }),
+    productionHold_priceLevel: (0, import_fields19.relationship)({ ref: "ProductionHold.priceLevel", many: true }),
+    inventoryHold_priceLevel: (0, import_fields19.relationship)({ ref: "InventoryHold.priceLevel", many: true }),
+    promoCode_priceLevels: (0, import_fields19.relationship)({ ref: "PromoCode.priceLevels", many: true }),
+    ticketOrderLine_priceLevel: (0, import_fields19.relationship)({ ref: "TicketOrderLine.priceLevel", many: true }),
+    currencyCode: (0, import_fields19.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    ...trackingFields
+  }
+});
+
+// features/keystone/models/PriceLevelPhase.ts
+var import_core21 = require("@keystone-6/core");
+var import_fields20 = require("@keystone-6/core/fields");
+var PriceLevelPhase = (0, import_core21.list)({
+  access: catalogAccess,
+  fields: {
+    name: (0, import_fields20.text)({}),
+    priceCents: (0, import_fields20.integer)({ defaultValue: 0 }),
+    quantity: (0, import_fields20.integer)({ defaultValue: 0 }),
+    sold: (0, import_fields20.integer)({ defaultValue: 0 }),
+    sort: (0, import_fields20.integer)({ defaultValue: 0 }),
+    startsAt: (0, import_fields20.timestamp)(),
+    priceLevel: (0, import_fields20.relationship)({ ref: "PriceLevel.priceLevelPhase_priceLevel", many: false }),
+    inventoryHold_phase: (0, import_fields20.relationship)({ ref: "InventoryHold.phase", many: true }),
+    ticketOrderLine_phase: (0, import_fields20.relationship)({ ref: "TicketOrderLine.phase", many: true }),
+    currencyCode: (0, import_fields20.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    ...trackingFields
+  }
+});
+
+// features/keystone/models/SeatInventory.ts
+var import_core22 = require("@keystone-6/core");
+var import_fields21 = require("@keystone-6/core/fields");
+var SeatInventory = (0, import_core22.list)({
   access: commandAccess,
   fields: {
-    holdKey: (0, import_fields19.text)({ isIndexed: true, db: { isNullable: true } }),
-    occupancyKey: (0, import_fields19.text)({ isIndexed: "unique", db: { isNullable: true } }),
-    eventSeatKey: (0, import_fields19.text)({ isIndexed: "unique", db: { isNullable: true } }),
-    status: (0, import_fields19.select)({ type: "string", options: ["open", "held", "sold", "killed", "comp", "reserved_hold"], defaultValue: "open", access: { update: () => false } }),
-    event: (0, import_fields19.relationship)({ ref: "Event.seatInventory_event", many: false }),
-    seat: (0, import_fields19.relationship)({ ref: "Seat.seatInventory_seat", many: false }),
-    priceLevel: (0, import_fields19.relationship)({ ref: "PriceLevel.seatInventory_priceLevel", many: false }),
-    productionHold_seats: (0, import_fields19.relationship)({ ref: "ProductionHold.seats", many: true }),
-    inventoryHold_seats: (0, import_fields19.relationship)({ ref: "InventoryHold.seats", many: true }),
-    ticket_seatInventory: (0, import_fields19.relationship)({ ref: "Ticket.seatInventory", many: true }),
+    holdKey: (0, import_fields21.text)({ isIndexed: true, db: { isNullable: true } }),
+    occupancyKey: (0, import_fields21.text)({ isIndexed: "unique", db: { isNullable: true } }),
+    eventSeatKey: (0, import_fields21.text)({ isIndexed: "unique", db: { isNullable: true } }),
+    status: (0, import_fields21.select)({ type: "string", options: ["open", "held", "sold", "killed", "comp", "reserved_hold"], defaultValue: "open", access: { update: () => false } }),
+    event: (0, import_fields21.relationship)({ ref: "Event.seatInventory_event", many: false }),
+    seat: (0, import_fields21.relationship)({ ref: "Seat.seatInventory_seat", many: false }),
+    priceLevel: (0, import_fields21.relationship)({ ref: "PriceLevel.seatInventory_priceLevel", many: false }),
+    productionHold_seats: (0, import_fields21.relationship)({ ref: "ProductionHold.seats", many: true }),
+    inventoryHold_seats: (0, import_fields21.relationship)({ ref: "InventoryHold.seats", many: true }),
+    ticket_seatInventory: (0, import_fields21.relationship)({ ref: "Ticket.seatInventory", many: true }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/ProductionHold.ts
-var import_core21 = require("@keystone-6/core");
-var import_fields20 = require("@keystone-6/core/fields");
-var ProductionHold = (0, import_core21.list)({
+var import_core23 = require("@keystone-6/core");
+var import_fields22 = require("@keystone-6/core/fields");
+var ProductionHold = (0, import_core23.list)({
   access: commandAccess,
   fields: {
-    quantity: (0, import_fields20.integer)({ defaultValue: 0 }),
-    releaseAt: (0, import_fields20.timestamp)(),
-    holdType: (0, import_fields20.select)({ type: "string", options: ["artist", "promoter", "production", "sponsor", "ada"], defaultValue: "artist", access: { update: () => false } }),
-    status: (0, import_fields20.select)({ type: "string", options: ["active", "released"], defaultValue: "active", access: { update: () => false } }),
-    event: (0, import_fields20.relationship)({ ref: "Event.productionHold_event", many: false }),
-    priceLevel: (0, import_fields20.relationship)({ ref: "PriceLevel.productionHold_priceLevel", many: false }),
-    seats: (0, import_fields20.relationship)({ ref: "SeatInventory.productionHold_seats", many: true }),
+    quantity: (0, import_fields22.integer)({ defaultValue: 0 }),
+    releaseAt: (0, import_fields22.timestamp)(),
+    holdType: (0, import_fields22.select)({ type: "string", options: ["artist", "promoter", "production", "sponsor", "ada"], defaultValue: "artist", access: { update: () => false } }),
+    status: (0, import_fields22.select)({ type: "string", options: ["active", "released"], defaultValue: "active", access: { update: () => false } }),
+    event: (0, import_fields22.relationship)({ ref: "Event.productionHold_event", many: false }),
+    priceLevel: (0, import_fields22.relationship)({ ref: "PriceLevel.productionHold_priceLevel", many: false }),
+    seats: (0, import_fields22.relationship)({ ref: "SeatInventory.productionHold_seats", many: true }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/InventoryHold.ts
-var import_core22 = require("@keystone-6/core");
-var import_fields21 = require("@keystone-6/core/fields");
-var InventoryHold = (0, import_core22.list)({
+var import_core24 = require("@keystone-6/core");
+var import_fields23 = require("@keystone-6/core/fields");
+var InventoryHold = (0, import_core24.list)({
   // A hold carries the buyer's quote; only order staff read it. Holds are written by checkout commands only.
   access: readAccess("canManageOrders", "canIssueRefunds"),
   fields: {
-    holdKey: (0, import_fields21.text)({ isIndexed: "unique", db: { isNullable: true } }),
-    secretHash: (0, import_fields21.text)({ access: { read: () => false, create: () => false, update: () => false } }),
-    presaleCode: (0, import_fields21.text)({ access: { read: () => false, create: () => false, update: () => false } }),
-    quantity: (0, import_fields21.integer)({ defaultValue: 0 }),
-    quoteSnapshot: (0, import_fields21.json)(),
-    expiresAt: (0, import_fields21.timestamp)(),
-    status: (0, import_fields21.select)({ type: "string", options: ["active", "converted", "released", "expired"], defaultValue: "active", access: { update: () => false } }),
-    event: (0, import_fields21.relationship)({ ref: "Event.inventoryHold_event", many: false }),
-    priceLevel: (0, import_fields21.relationship)({ ref: "PriceLevel.inventoryHold_priceLevel", many: false }),
-    phase: (0, import_fields21.relationship)({ ref: "PriceLevelPhase.inventoryHold_phase", many: false }),
-    customer: (0, import_fields21.relationship)({ ref: "User.inventoryHold_customer", many: false }),
-    seats: (0, import_fields21.relationship)({ ref: "SeatInventory.inventoryHold_seats", many: true }),
-    order: (0, import_fields21.relationship)({ ref: "TicketOrder.inventoryHold_order", many: false }),
-    promoCode: (0, import_fields21.relationship)({ ref: "PromoCode.inventoryHold_promoCode", many: false }),
-    promoRedemptions: (0, import_fields21.relationship)({ ref: "PromoRedemption.hold", many: true }),
+    holdKey: (0, import_fields23.text)({ isIndexed: "unique", db: { isNullable: true } }),
+    secretHash: (0, import_fields23.text)({ access: { read: () => false, create: () => false, update: () => false } }),
+    presaleCode: (0, import_fields23.text)({ access: { read: () => false, create: () => false, update: () => false } }),
+    quantity: (0, import_fields23.integer)({ defaultValue: 0 }),
+    quoteSnapshot: (0, import_fields23.json)(),
+    expiresAt: (0, import_fields23.timestamp)(),
+    status: (0, import_fields23.select)({ type: "string", options: ["active", "converted", "released", "expired"], defaultValue: "active", access: { update: () => false } }),
+    event: (0, import_fields23.relationship)({ ref: "Event.inventoryHold_event", many: false }),
+    priceLevel: (0, import_fields23.relationship)({ ref: "PriceLevel.inventoryHold_priceLevel", many: false }),
+    phase: (0, import_fields23.relationship)({ ref: "PriceLevelPhase.inventoryHold_phase", many: false }),
+    customer: (0, import_fields23.relationship)({ ref: "User.inventoryHold_customer", many: false }),
+    seats: (0, import_fields23.relationship)({ ref: "SeatInventory.inventoryHold_seats", many: true }),
+    order: (0, import_fields23.relationship)({ ref: "TicketOrder.inventoryHold_order", many: false }),
+    promoCode: (0, import_fields23.relationship)({ ref: "PromoCode.inventoryHold_promoCode", many: false }),
+    promoRedemptions: (0, import_fields23.relationship)({ ref: "PromoRedemption.hold", many: true }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/PromoCode.ts
-var import_core23 = require("@keystone-6/core");
-var import_fields22 = require("@keystone-6/core/fields");
-var PromoCode = (0, import_core23.list)({
+var import_core25 = require("@keystone-6/core");
+var import_fields24 = require("@keystone-6/core/fields");
+var PromoCode = (0, import_core25.list)({
   access: catalogAccess,
   fields: {
-    code: (0, import_fields22.text)({ isIndexed: "unique", validation: { isRequired: true, match: { regex: /^[A-Z0-9_-]+$/, explanation: "Uppercase letters, numbers, - and _" } } }),
-    discountType: (0, import_fields22.select)({ type: "string", options: ["percent_bps", "amount_cents", "comp"], defaultValue: "percent_bps" }),
-    value: (0, import_fields22.integer)({ defaultValue: 0, validation: { min: 0 } }),
-    maxUses: (0, import_fields22.integer)({ validation: { min: 1 } }),
-    usedCount: (0, import_fields22.integer)({ defaultValue: 0, access: { create: () => false, update: () => false } }),
-    perOrderLimit: (0, import_fields22.integer)({ validation: { min: 1 } }),
-    startsAt: (0, import_fields22.timestamp)(),
-    endsAt: (0, import_fields22.timestamp)(),
-    status: (0, import_fields22.select)({ type: "string", options: ["active", "paused", "expired"], defaultValue: "active" }),
-    event: (0, import_fields22.relationship)({ ref: "Event.promoCode_event", many: false }),
-    priceLevels: (0, import_fields22.relationship)({ ref: "PriceLevel.promoCode_priceLevels", many: true }),
-    inventoryHold_promoCode: (0, import_fields22.relationship)({ ref: "InventoryHold.promoCode", many: true }),
-    redemptions: (0, import_fields22.relationship)({ ref: "PromoRedemption.promoCode", many: true }),
+    code: (0, import_fields24.text)({ isIndexed: "unique", validation: { isRequired: true, match: { regex: /^[A-Z0-9_-]+$/, explanation: "Uppercase letters, numbers, - and _" } } }),
+    discountType: (0, import_fields24.select)({ type: "string", options: ["percent_bps", "amount_cents", "comp"], defaultValue: "percent_bps" }),
+    value: (0, import_fields24.integer)({ defaultValue: 0, validation: { min: 0 } }),
+    maxUses: (0, import_fields24.integer)({ validation: { min: 1 } }),
+    usedCount: (0, import_fields24.integer)({ defaultValue: 0, access: { create: () => false, update: () => false } }),
+    perOrderLimit: (0, import_fields24.integer)({ validation: { min: 1 } }),
+    startsAt: (0, import_fields24.timestamp)(),
+    endsAt: (0, import_fields24.timestamp)(),
+    status: (0, import_fields24.select)({ type: "string", options: ["active", "paused", "expired"], defaultValue: "active" }),
+    event: (0, import_fields24.relationship)({ ref: "Event.promoCode_event", many: false }),
+    priceLevels: (0, import_fields24.relationship)({ ref: "PriceLevel.promoCode_priceLevels", many: true }),
+    inventoryHold_promoCode: (0, import_fields24.relationship)({ ref: "InventoryHold.promoCode", many: true }),
+    redemptions: (0, import_fields24.relationship)({ ref: "PromoRedemption.promoCode", many: true }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/PromoRedemption.ts
-var import_core24 = require("@keystone-6/core");
-var import_fields23 = require("@keystone-6/core/fields");
-var PromoRedemption = (0, import_core24.list)({
+var import_core26 = require("@keystone-6/core");
+var import_fields25 = require("@keystone-6/core/fields");
+var PromoRedemption = (0, import_core26.list)({
   access: readAccess("canManageOrders", "canIssueRefunds"),
   graphql: { plural: "PromoRedemptionRecords" },
   fields: {
-    promoCode: (0, import_fields23.relationship)({ ref: "PromoCode.redemptions" }),
-    hold: (0, import_fields23.relationship)({ ref: "InventoryHold.promoRedemptions" }),
-    order: (0, import_fields23.relationship)({ ref: "TicketOrder.promoRedemptions" }),
-    amountCents: (0, import_fields23.integer)({ defaultValue: 0 }),
-    status: (0, import_fields23.select)({ type: "string", options: ["reserved", "committed", "released"], defaultValue: "reserved", access: { update: () => false } }),
+    promoCode: (0, import_fields25.relationship)({ ref: "PromoCode.redemptions" }),
+    hold: (0, import_fields25.relationship)({ ref: "InventoryHold.promoRedemptions" }),
+    order: (0, import_fields25.relationship)({ ref: "TicketOrder.promoRedemptions" }),
+    amountCents: (0, import_fields25.integer)({ defaultValue: 0 }),
+    status: (0, import_fields25.select)({ type: "string", options: ["reserved", "committed", "released"], defaultValue: "reserved", access: { update: () => false } }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/TicketOrder.ts
-var import_core25 = require("@keystone-6/core");
-var import_fields24 = require("@keystone-6/core/fields");
-var TicketOrder = (0, import_core25.list)({
+var import_core27 = require("@keystone-6/core");
+var import_fields26 = require("@keystone-6/core/fields");
+var TicketOrder = (0, import_core27.list)({
   access: readAccess("canManageOrders", "canIssueRefunds"),
   fields: {
-    orderNumber: (0, import_fields24.text)({ isIndexed: "unique", db: { isNullable: true } }),
-    guestEmail: (0, import_fields24.text)({}),
-    guestName: (0, import_fields24.text)({}),
+    orderNumber: (0, import_fields26.text)({ isIndexed: "unique", db: { isNullable: true } }),
+    guestEmail: (0, import_fields26.text)({}),
+    guestName: (0, import_fields26.text)({}),
     // Test and QA orders are hidden from every staff list and report, never deleted (fleet rule).
-    hiddenAt: (0, import_fields24.timestamp)({ access: { create: () => false, update: () => false }, ui: { createView: { fieldMode: "hidden" }, itemView: { fieldMode: "read" } } }),
-    secretKey: (0, import_fields24.text)({ access: { read: () => false, create: () => false, update: () => false } }),
-    subtotalCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    serviceFeesCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    facilityFeesCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    taxCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    discountCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    totalCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    refundedCents: (0, import_fields24.integer)({ defaultValue: 0 }),
-    ageAttested: (0, import_fields24.checkbox)({ defaultValue: false }),
-    status: (0, import_fields24.select)({ type: "string", options: ["pending_payment", "paid", "partially_refunded", "refunded", "cancelled", "comp"], defaultValue: "pending_payment", access: { update: () => false } }),
-    source: (0, import_fields24.select)({ type: "string", options: ["online", "box_office", "comp", "presale"], defaultValue: "online", access: { update: () => false } }),
-    customer: (0, import_fields24.relationship)({ ref: "User.ticketOrder_customer", many: false }),
-    event: (0, import_fields24.relationship)({ ref: "Event.ticketOrder_event", many: false }),
-    paymentCollection: (0, import_fields24.relationship)({ ref: "PaymentCollection.ticketOrder_paymentCollection", many: false }),
-    inventoryHold_order: (0, import_fields24.relationship)({ ref: "InventoryHold.order", many: true }),
-    ticketOrderLine_order: (0, import_fields24.relationship)({ ref: "TicketOrderLine.order", many: true }),
-    ticket_order: (0, import_fields24.relationship)({ ref: "Ticket.order", many: true }),
-    currencyCode: (0, import_fields24.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
-    payments: (0, import_fields24.relationship)({ ref: "Payment.order", many: true }),
-    promoRedemptions: (0, import_fields24.relationship)({ ref: "PromoRedemption.order", many: true }),
-    discountSnapshot: (0, import_fields24.json)(),
+    hiddenAt: (0, import_fields26.timestamp)({ access: { create: () => false, update: () => false }, ui: { createView: { fieldMode: "hidden" }, itemView: { fieldMode: "read" } } }),
+    secretKey: (0, import_fields26.text)({ access: { read: () => false, create: () => false, update: () => false } }),
+    subtotalCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    serviceFeesCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    facilityFeesCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    taxCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    discountCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    totalCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    refundedCents: (0, import_fields26.integer)({ defaultValue: 0 }),
+    ageAttested: (0, import_fields26.checkbox)({ defaultValue: false }),
+    status: (0, import_fields26.select)({ type: "string", options: ["pending_payment", "paid", "partially_refunded", "refunded", "cancelled", "comp"], defaultValue: "pending_payment", access: { update: () => false } }),
+    source: (0, import_fields26.select)({ type: "string", options: ["online", "box_office", "comp", "presale"], defaultValue: "online", access: { update: () => false } }),
+    customer: (0, import_fields26.relationship)({ ref: "User.ticketOrder_customer", many: false }),
+    event: (0, import_fields26.relationship)({ ref: "Event.ticketOrder_event", many: false }),
+    paymentCollection: (0, import_fields26.relationship)({ ref: "PaymentCollection.ticketOrder_paymentCollection", many: false }),
+    inventoryHold_order: (0, import_fields26.relationship)({ ref: "InventoryHold.order", many: true }),
+    ticketOrderLine_order: (0, import_fields26.relationship)({ ref: "TicketOrderLine.order", many: true }),
+    ticket_order: (0, import_fields26.relationship)({ ref: "Ticket.order", many: true }),
+    currencyCode: (0, import_fields26.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    payments: (0, import_fields26.relationship)({ ref: "Payment.order", many: true }),
+    promoRedemptions: (0, import_fields26.relationship)({ ref: "PromoRedemption.order", many: true }),
+    discountSnapshot: (0, import_fields26.json)(),
     // Set when the confirmation email with the tickets was handed to the mail server.
-    confirmationSentAt: (0, import_fields24.timestamp)({ access: { create: () => false, update: () => false } }),
-    confirmationMessageId: (0, import_fields24.text)({ access: { create: () => false, update: () => false } }),
+    confirmationSentAt: (0, import_fields26.timestamp)({ access: { create: () => false, update: () => false } }),
+    confirmationMessageId: (0, import_fields26.text)({ access: { create: () => false, update: () => false } }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/TicketOrderLine.ts
-var import_core26 = require("@keystone-6/core");
-var import_fields25 = require("@keystone-6/core/fields");
-var TicketOrderLine = (0, import_core26.list)({
+var import_core28 = require("@keystone-6/core");
+var import_fields27 = require("@keystone-6/core/fields");
+var TicketOrderLine = (0, import_core28.list)({
   access: readAccess("canManageOrders", "canIssueRefunds"),
   fields: {
-    title: (0, import_fields25.text)({}),
-    levelName: (0, import_fields25.text)({}),
-    phaseName: (0, import_fields25.text)({}),
-    seatLabel: (0, import_fields25.text)({}),
-    unitPriceCents: (0, import_fields25.integer)({ defaultValue: 0 }),
-    serviceFeeCents: (0, import_fields25.integer)({ defaultValue: 0 }),
-    facilityFeeCents: (0, import_fields25.integer)({ defaultValue: 0 }),
-    taxCents: (0, import_fields25.integer)({ defaultValue: 0 }),
-    quantity: (0, import_fields25.integer)({ defaultValue: 0 }),
-    discountCents: (0, import_fields25.integer)({ defaultValue: 0 }),
-    totalCents: (0, import_fields25.integer)({ defaultValue: 0 }),
-    order: (0, import_fields25.relationship)({ ref: "TicketOrder.ticketOrderLine_order", many: false }),
-    priceLevel: (0, import_fields25.relationship)({ ref: "PriceLevel.ticketOrderLine_priceLevel", many: false }),
-    phase: (0, import_fields25.relationship)({ ref: "PriceLevelPhase.ticketOrderLine_phase", many: false }),
-    ticket_line: (0, import_fields25.relationship)({ ref: "Ticket.line", many: true }),
-    currencyCode: (0, import_fields25.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    title: (0, import_fields27.text)({}),
+    levelName: (0, import_fields27.text)({}),
+    phaseName: (0, import_fields27.text)({}),
+    seatLabel: (0, import_fields27.text)({}),
+    unitPriceCents: (0, import_fields27.integer)({ defaultValue: 0 }),
+    serviceFeeCents: (0, import_fields27.integer)({ defaultValue: 0 }),
+    facilityFeeCents: (0, import_fields27.integer)({ defaultValue: 0 }),
+    taxCents: (0, import_fields27.integer)({ defaultValue: 0 }),
+    quantity: (0, import_fields27.integer)({ defaultValue: 0 }),
+    discountCents: (0, import_fields27.integer)({ defaultValue: 0 }),
+    totalCents: (0, import_fields27.integer)({ defaultValue: 0 }),
+    order: (0, import_fields27.relationship)({ ref: "TicketOrder.ticketOrderLine_order", many: false }),
+    priceLevel: (0, import_fields27.relationship)({ ref: "PriceLevel.ticketOrderLine_priceLevel", many: false }),
+    phase: (0, import_fields27.relationship)({ ref: "PriceLevelPhase.ticketOrderLine_phase", many: false }),
+    ticket_line: (0, import_fields27.relationship)({ ref: "Ticket.line", many: true }),
+    currencyCode: (0, import_fields27.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/Ticket.ts
-var import_core27 = require("@keystone-6/core");
-var import_fields26 = require("@keystone-6/core/fields");
-var Ticket = (0, import_core27.list)({
+var import_core29 = require("@keystone-6/core");
+var import_fields28 = require("@keystone-6/core/fields");
+var Ticket = (0, import_core29.list)({
   access: readAccess("canManageOrders", "canIssueRefunds", "canScanTickets"),
   fields: {
-    ticketCode: (0, import_fields26.text)({ isIndexed: "unique", db: { isNullable: true } }),
-    tokenHash: (0, import_fields26.text)({ access: { read: () => false, create: () => false, update: () => false } }),
-    holderName: (0, import_fields26.text)({}),
-    holderEmail: (0, import_fields26.text)({}),
-    status: (0, import_fields26.select)({ type: "string", options: ["valid", "checked_in", "void", "refunded", "transferred"], defaultValue: "valid", access: { update: () => false } }),
-    order: (0, import_fields26.relationship)({ ref: "TicketOrder.ticket_order", many: false }),
-    event: (0, import_fields26.relationship)({ ref: "Event.ticket_event", many: false }),
-    line: (0, import_fields26.relationship)({ ref: "TicketOrderLine.ticket_line", many: false }),
-    seatInventory: (0, import_fields26.relationship)({ ref: "SeatInventory.ticket_seatInventory", many: false }),
-    transferredFrom: (0, import_fields26.relationship)({ ref: "Ticket.ticket_transferredFrom", many: false }),
-    ticket_transferredFrom: (0, import_fields26.relationship)({ ref: "Ticket.transferredFrom", many: true }),
-    scanEvent_ticket: (0, import_fields26.relationship)({ ref: "ScanEvent.ticket", many: true }),
+    ticketCode: (0, import_fields28.text)({ isIndexed: "unique", db: { isNullable: true } }),
+    tokenHash: (0, import_fields28.text)({ access: { read: () => false, create: () => false, update: () => false } }),
+    holderName: (0, import_fields28.text)({}),
+    holderEmail: (0, import_fields28.text)({}),
+    status: (0, import_fields28.select)({ type: "string", options: ["valid", "checked_in", "void", "refunded", "transferred"], defaultValue: "valid", access: { update: () => false } }),
+    order: (0, import_fields28.relationship)({ ref: "TicketOrder.ticket_order", many: false }),
+    event: (0, import_fields28.relationship)({ ref: "Event.ticket_event", many: false }),
+    line: (0, import_fields28.relationship)({ ref: "TicketOrderLine.ticket_line", many: false }),
+    seatInventory: (0, import_fields28.relationship)({ ref: "SeatInventory.ticket_seatInventory", many: false }),
+    transferredFrom: (0, import_fields28.relationship)({ ref: "Ticket.ticket_transferredFrom", many: false }),
+    ticket_transferredFrom: (0, import_fields28.relationship)({ ref: "Ticket.transferredFrom", many: true }),
+    scanEvent_ticket: (0, import_fields28.relationship)({ ref: "ScanEvent.ticket", many: true }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/ScanEvent.ts
-var import_core28 = require("@keystone-6/core");
-var import_fields27 = require("@keystone-6/core/fields");
-var ScanEvent = (0, import_core28.list)({
+var import_core30 = require("@keystone-6/core");
+var import_fields29 = require("@keystone-6/core/fields");
+var ScanEvent = (0, import_core30.list)({
   access: readAccess("canScanTickets", "canManageOrders", "canIssueRefunds"),
   fields: {
-    gate: (0, import_fields27.text)({}),
-    at: (0, import_fields27.timestamp)(),
-    result: (0, import_fields27.select)({ type: "string", options: ["admitted", "duplicate", "wrong_event", "void", "reentry"], defaultValue: "admitted", access: { update: () => false } }),
-    ticket: (0, import_fields27.relationship)({ ref: "Ticket.scanEvent_ticket", many: false }),
-    event: (0, import_fields27.relationship)({ ref: "Event.scanEvent_event", many: false }),
-    scannedBy: (0, import_fields27.relationship)({ ref: "User.scanEvent_scannedBy", many: false }),
+    gate: (0, import_fields29.text)({}),
+    at: (0, import_fields29.timestamp)(),
+    result: (0, import_fields29.select)({ type: "string", options: ["admitted", "duplicate", "wrong_event", "void", "reentry"], defaultValue: "admitted", access: { update: () => false } }),
+    ticket: (0, import_fields29.relationship)({ ref: "Ticket.scanEvent_ticket", many: false }),
+    event: (0, import_fields29.relationship)({ ref: "Event.scanEvent_event", many: false }),
+    scannedBy: (0, import_fields29.relationship)({ ref: "User.scanEvent_scannedBy", many: false }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/MerchSales.ts
-var import_core29 = require("@keystone-6/core");
-var import_fields28 = require("@keystone-6/core/fields");
-var MerchSales = (0, import_core29.list)({
+var import_core31 = require("@keystone-6/core");
+var import_fields30 = require("@keystone-6/core/fields");
+var MerchSales = (0, import_core31.list)({
   graphql: { plural: "MerchSalesRecords" },
   access: readAccess("canManageSettlements"),
   fields: {
-    softGrossCents: (0, import_fields28.integer)({ defaultValue: 0 }),
-    hardGrossCents: (0, import_fields28.integer)({ defaultValue: 0 }),
-    venueSoftSplitBps: (0, import_fields28.integer)({ defaultValue: 0 }),
-    venueHardSplitBps: (0, import_fields28.integer)({ defaultValue: 0 }),
-    venueShareCents: (0, import_fields28.integer)({ defaultValue: 0 }),
-    sellerFeeCents: (0, import_fields28.integer)({ defaultValue: 0 }),
-    countIn: (0, import_fields28.json)(),
-    countOut: (0, import_fields28.json)(),
-    event: (0, import_fields28.relationship)({ ref: "Event.merchSales_event", many: false }),
-    currencyCode: (0, import_fields28.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
-    ...trackingFields
-  }
-});
-
-// features/keystone/models/BarSales.ts
-var import_core30 = require("@keystone-6/core");
-var import_fields29 = require("@keystone-6/core/fields");
-var BarSales = (0, import_core30.list)({
-  graphql: { plural: "BarSalesRecords" },
-  access: readAccess("canManageSettlements"),
-  fields: {
-    grossCents: (0, import_fields29.integer)({ defaultValue: 0 }),
-    promoterShareBps: (0, import_fields29.integer)({ defaultValue: 0 }),
-    event: (0, import_fields29.relationship)({ ref: "Event.barSales_event", many: false }),
-    currencyCode: (0, import_fields29.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
-    ...trackingFields
-  }
-});
-
-// features/keystone/models/Settlement.ts
-var import_core31 = require("@keystone-6/core");
-var import_fields30 = require("@keystone-6/core/fields");
-var Settlement = (0, import_core31.list)({
-  access: readAccess("canManageSettlements"),
-  fields: {
-    hash: (0, import_fields30.text)({}),
-    version: (0, import_fields30.integer)({ defaultValue: 1 }),
-    ticketGrossCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    ticketFeesCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    taxCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    compCount: (0, import_fields30.integer)({ defaultValue: 0 }),
-    paidCount: (0, import_fields30.integer)({ defaultValue: 0 }),
-    netBoxOfficeCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    totalExpensesCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    cappedExpensesCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    breakevenCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    splitPointCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    artistGuaranteeCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    artistOverageCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    artistTotalCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    merchVenueShareCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    depositsPaidCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    balanceDueArtistCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    promoterNetCents: (0, import_fields30.integer)({ defaultValue: 0 }),
-    computedSnapshot: (0, import_fields30.json)(),
-    approvals: (0, import_fields30.json)(),
-    status: (0, import_fields30.select)({ type: "string", options: ["draft", "reviewed", "signed_promoter", "signed_artist", "final", "void"], defaultValue: "draft", access: { update: () => false } }),
-    event: (0, import_fields30.relationship)({ ref: "Event.settlement_event", many: false }),
-    previousVersion: (0, import_fields30.relationship)({ ref: "Settlement.settlement_previousVersion", many: false }),
-    settlement_previousVersion: (0, import_fields30.relationship)({ ref: "Settlement.previousVersion", many: true }),
-    settlementLine_settlement: (0, import_fields30.relationship)({ ref: "SettlementLine.settlement", many: true }),
-    artistPayment_settlement: (0, import_fields30.relationship)({ ref: "ArtistPayment.settlement", many: true }),
+    softGrossCents: (0, import_fields30.integer)({ defaultValue: 0 }),
+    hardGrossCents: (0, import_fields30.integer)({ defaultValue: 0 }),
+    venueSoftSplitBps: (0, import_fields30.integer)({ defaultValue: 0 }),
+    venueHardSplitBps: (0, import_fields30.integer)({ defaultValue: 0 }),
+    venueShareCents: (0, import_fields30.integer)({ defaultValue: 0 }),
+    sellerFeeCents: (0, import_fields30.integer)({ defaultValue: 0 }),
+    countIn: (0, import_fields30.json)(),
+    countOut: (0, import_fields30.json)(),
+    event: (0, import_fields30.relationship)({ ref: "Event.merchSales_event", many: false }),
     currencyCode: (0, import_fields30.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/SettlementLine.ts
+// features/keystone/models/BarSales.ts
 var import_core32 = require("@keystone-6/core");
 var import_fields31 = require("@keystone-6/core/fields");
-var SettlementLine = (0, import_core32.list)({
+var BarSales = (0, import_core32.list)({
+  graphql: { plural: "BarSalesRecords" },
   access: readAccess("canManageSettlements"),
   fields: {
-    label: (0, import_fields31.text)({}),
-    sourceRef: (0, import_fields31.text)({}),
-    reason: (0, import_fields31.text)({}),
-    amountCents: (0, import_fields31.integer)({ defaultValue: 0 }),
-    roundingRemainder: (0, import_fields31.integer)({ defaultValue: 0 }),
-    kind: (0, import_fields31.select)({ type: "string", options: ["gross", "fee", "tax", "expense", "guarantee", "overage", "merch", "deposit", "adjustment", "rounding", "payment"], defaultValue: "gross", access: { update: () => false } }),
-    settlement: (0, import_fields31.relationship)({ ref: "Settlement.settlementLine_settlement", many: false }),
-    approvedBy: (0, import_fields31.relationship)({ ref: "User.settlementLine_approvedBy", many: false }),
+    grossCents: (0, import_fields31.integer)({ defaultValue: 0 }),
+    promoterShareBps: (0, import_fields31.integer)({ defaultValue: 0 }),
+    event: (0, import_fields31.relationship)({ ref: "Event.barSales_event", many: false }),
     currencyCode: (0, import_fields31.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/ArtistPayment.ts
+// features/keystone/models/Settlement.ts
 var import_core33 = require("@keystone-6/core");
 var import_fields32 = require("@keystone-6/core/fields");
-var ArtistPayment = (0, import_core33.list)({
+var Settlement = (0, import_core33.list)({
   access: readAccess("canManageSettlements"),
   fields: {
-    method: (0, import_fields32.text)({}),
-    reference: (0, import_fields32.text)({}),
-    amountCents: (0, import_fields32.integer)({ defaultValue: 0 }),
-    kind: (0, import_fields32.select)({ type: "string", options: ["deposit", "balance"], defaultValue: "deposit", access: { update: () => false } }),
-    status: (0, import_fields32.select)({ type: "string", options: ["scheduled", "paid", "void"], defaultValue: "scheduled", access: { update: () => false } }),
-    settlement: (0, import_fields32.relationship)({ ref: "Settlement.artistPayment_settlement", many: false }),
+    hash: (0, import_fields32.text)({}),
+    version: (0, import_fields32.integer)({ defaultValue: 1 }),
+    ticketGrossCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    ticketFeesCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    taxCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    compCount: (0, import_fields32.integer)({ defaultValue: 0 }),
+    paidCount: (0, import_fields32.integer)({ defaultValue: 0 }),
+    netBoxOfficeCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    totalExpensesCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    cappedExpensesCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    breakevenCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    splitPointCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    artistGuaranteeCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    artistOverageCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    artistTotalCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    merchVenueShareCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    depositsPaidCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    balanceDueArtistCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    promoterNetCents: (0, import_fields32.integer)({ defaultValue: 0 }),
+    computedSnapshot: (0, import_fields32.json)(),
+    approvals: (0, import_fields32.json)(),
+    status: (0, import_fields32.select)({ type: "string", options: ["draft", "reviewed", "signed_promoter", "signed_artist", "final", "void"], defaultValue: "draft", access: { update: () => false } }),
+    event: (0, import_fields32.relationship)({ ref: "Event.settlement_event", many: false }),
+    previousVersion: (0, import_fields32.relationship)({ ref: "Settlement.settlement_previousVersion", many: false }),
+    settlement_previousVersion: (0, import_fields32.relationship)({ ref: "Settlement.previousVersion", many: true }),
+    settlementLine_settlement: (0, import_fields32.relationship)({ ref: "SettlementLine.settlement", many: true }),
+    artistPayment_settlement: (0, import_fields32.relationship)({ ref: "ArtistPayment.settlement", many: true }),
     currencyCode: (0, import_fields32.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
     ...trackingFields
   }
 });
 
-// features/keystone/models/AuditEvent.ts
+// features/keystone/models/SettlementLine.ts
 var import_core34 = require("@keystone-6/core");
 var import_fields33 = require("@keystone-6/core/fields");
-var AuditEvent = (0, import_core34.list)({
+var SettlementLine = (0, import_core34.list)({
+  access: readAccess("canManageSettlements"),
+  fields: {
+    label: (0, import_fields33.text)({}),
+    sourceRef: (0, import_fields33.text)({}),
+    reason: (0, import_fields33.text)({}),
+    amountCents: (0, import_fields33.integer)({ defaultValue: 0 }),
+    roundingRemainder: (0, import_fields33.integer)({ defaultValue: 0 }),
+    kind: (0, import_fields33.select)({ type: "string", options: ["gross", "fee", "tax", "expense", "guarantee", "overage", "merch", "deposit", "adjustment", "rounding", "payment"], defaultValue: "gross", access: { update: () => false } }),
+    settlement: (0, import_fields33.relationship)({ ref: "Settlement.settlementLine_settlement", many: false }),
+    approvedBy: (0, import_fields33.relationship)({ ref: "User.settlementLine_approvedBy", many: false }),
+    currencyCode: (0, import_fields33.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    ...trackingFields
+  }
+});
+
+// features/keystone/models/ArtistPayment.ts
+var import_core35 = require("@keystone-6/core");
+var import_fields34 = require("@keystone-6/core/fields");
+var ArtistPayment = (0, import_core35.list)({
+  access: readAccess("canManageSettlements"),
+  fields: {
+    method: (0, import_fields34.text)({}),
+    reference: (0, import_fields34.text)({}),
+    amountCents: (0, import_fields34.integer)({ defaultValue: 0 }),
+    kind: (0, import_fields34.select)({ type: "string", options: ["deposit", "balance"], defaultValue: "deposit", access: { update: () => false } }),
+    status: (0, import_fields34.select)({ type: "string", options: ["scheduled", "paid", "void"], defaultValue: "scheduled", access: { update: () => false } }),
+    settlement: (0, import_fields34.relationship)({ ref: "Settlement.artistPayment_settlement", many: false }),
+    currencyCode: (0, import_fields34.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    ...trackingFields
+  }
+});
+
+// features/keystone/models/AuditEvent.ts
+var import_core36 = require("@keystone-6/core");
+var import_fields35 = require("@keystone-6/core/fields");
+var AuditEvent = (0, import_core36.list)({
   access: { operation: { query: permissions.canReadAudit, create: () => false, update: () => false, delete: () => false } },
   fields: {
-    action: (0, import_fields33.text)({}),
-    targetList: (0, import_fields33.text)({}),
-    targetId: (0, import_fields33.text)({}),
-    reason: (0, import_fields33.text)({}),
-    requestId: (0, import_fields33.text)({}),
-    before: (0, import_fields33.json)(),
-    after: (0, import_fields33.json)(),
-    actor: (0, import_fields33.relationship)({ ref: "User.auditEvent_actor", many: false }),
+    action: (0, import_fields35.text)({}),
+    targetList: (0, import_fields35.text)({}),
+    targetId: (0, import_fields35.text)({}),
+    reason: (0, import_fields35.text)({}),
+    requestId: (0, import_fields35.text)({}),
+    before: (0, import_fields35.json)(),
+    after: (0, import_fields35.json)(),
+    actor: (0, import_fields35.relationship)({ ref: "User.auditEvent_actor", many: false }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/StoreSettings.ts
-var import_core35 = require("@keystone-6/core");
-var import_fields35 = require("@keystone-6/core/fields");
+var import_core37 = require("@keystone-6/core");
+var import_fields37 = require("@keystone-6/core/fields");
 
 // features/keystone/models/storeLogoFields.ts
-var import_fields34 = require("@keystone-6/core/fields");
+var import_fields36 = require("@keystone-6/core/fields");
 
 // features/platform/store-settings/lib/icon-registry.ts
 var LOGO_ICONS = [
@@ -1737,7 +1805,7 @@ function sanitizeStoreLogoSvg(svg) {
 
 // features/keystone/models/storeLogoFields.ts
 var storeLogoFields = {
-  logoIcon: (0, import_fields34.text)({
+  logoIcon: (0, import_fields36.text)({
     defaultValue: DEFAULT_STORE_LOGO_ICON,
     hooks: {
       resolveInput: ({ resolvedData, fieldKey }) => {
@@ -1753,7 +1821,7 @@ var storeLogoFields = {
       }
     }
   }),
-  logoColor: (0, import_fields34.text)({
+  logoColor: (0, import_fields36.text)({
     defaultValue: DEFAULT_STORE_LOGO_COLOR,
     hooks: {
       resolveInput: ({ resolvedData, fieldKey }) => {
@@ -1765,28 +1833,32 @@ var storeLogoFields = {
 };
 
 // features/keystone/models/StoreSettings.ts
-var StoreSettings = (0, import_core35.list)({
+var StoreSettings = (0, import_core37.list)({
   graphql: { plural: "StoreSettingsRecords" },
   access: catalogAccess,
   fields: {
-    name: (0, import_fields35.text)({}),
-    refundApprovalThresholdCents: (0, import_fields35.integer)({ defaultValue: 0 }),
-    manager: (0, import_fields35.relationship)({ ref: "User.storeSettings_manager", many: false }),
+    name: (0, import_fields37.text)({}),
+    refundApprovalThresholdCents: (0, import_fields37.integer)({ defaultValue: 0 }),
+    manager: (0, import_fields37.relationship)({ ref: "User.storeSettings_manager", many: false }),
     // Shown to customers in the storefront footer and in every email.
-    supportEmail: (0, import_fields35.text)({ validation: { match: { regex: /^$|^[^@\s]+@[^@\s]+\.[^@\s]+$/, explanation: "Enter an email address" } } }),
-    supportPhone: (0, import_fields35.text)({}),
-    refundPolicy: (0, import_fields35.text)({ ui: { displayMode: "textarea" } }),
-    currencyCode: (0, import_fields35.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    supportEmail: (0, import_fields37.text)({ validation: { match: { regex: /^$|^[^@\s]+@[^@\s]+\.[^@\s]+$/, explanation: "Enter an email address" } } }),
+    supportPhone: (0, import_fields37.text)({}),
+    refundPolicy: (0, import_fields37.text)({ ui: { displayMode: "textarea" } }),
+    currencyCode: (0, import_fields37.text)({ defaultValue: "USD", validation: { match: { regex: /^[A-Z]{3}$/, explanation: "ISO 4217 currency code" } } }),
+    // Calendar (holds and challenges).
+    challengeBusinessDays: (0, import_fields37.integer)({ defaultValue: 1, validation: { min: 0, max: 30 } }),
+    challengeCountsWeekends: (0, import_fields37.checkbox)({ defaultValue: false }),
+    holdExpiryDays: (0, import_fields37.integer)({ defaultValue: 7, validation: { min: 1, max: 365 } }),
     ...storeLogoFields,
     ...trackingFields
   }
 });
 
 // features/keystone/models/PaymentProvider.ts
-var import_core36 = require("@keystone-6/core");
-var import_fields36 = require("@keystone-6/core/fields");
+var import_core38 = require("@keystone-6/core");
+var import_fields38 = require("@keystone-6/core/fields");
 var canConfigureProvider = (args) => isSignedIn(args) && permissions.canManagePayments(args);
-var PaymentProvider = (0, import_core36.list)({
+var PaymentProvider = (0, import_core38.list)({
   access: {
     operation: {
       query: ({ session }) => permissions.canReadPayments({ session }) || permissions.canManagePayments({ session }),
@@ -1801,10 +1873,10 @@ var PaymentProvider = (0, import_core36.list)({
     }
   },
   fields: {
-    name: (0, import_fields36.text)({
+    name: (0, import_fields38.text)({
       validation: { isRequired: true }
     }),
-    code: (0, import_fields36.text)({
+    code: (0, import_fields38.text)({
       isIndexed: "unique",
       validation: {
         isRequired: true,
@@ -1814,53 +1886,53 @@ var PaymentProvider = (0, import_core36.list)({
         }
       }
     }),
-    isInstalled: (0, import_fields36.checkbox)({
+    isInstalled: (0, import_fields38.checkbox)({
       defaultValue: true
     }),
-    credentials: (0, import_fields36.json)({
+    credentials: (0, import_fields38.json)({
       access: { read: () => false, create: canConfigureProvider, update: canConfigureProvider },
       defaultValue: {}
     }),
-    metadata: (0, import_fields36.json)({
+    metadata: (0, import_fields38.json)({
       defaultValue: {}
     }),
-    createPaymentFunction: (0, import_fields36.text)({
+    createPaymentFunction: (0, import_fields38.text)({
       validation: { isRequired: true },
       ui: {
         description: "Name of the adapter function to create payments"
       }
     }),
-    capturePaymentFunction: (0, import_fields36.text)({
+    capturePaymentFunction: (0, import_fields38.text)({
       validation: { isRequired: true },
       ui: {
         description: "Name of the adapter function to capture payments"
       }
     }),
-    refundPaymentFunction: (0, import_fields36.text)({
+    refundPaymentFunction: (0, import_fields38.text)({
       validation: { isRequired: true },
       ui: {
         description: "Name of the adapter function to refund payments"
       }
     }),
-    getPaymentStatusFunction: (0, import_fields36.text)({
+    getPaymentStatusFunction: (0, import_fields38.text)({
       validation: { isRequired: true },
       ui: {
         description: "Name of the adapter function to check payment status"
       }
     }),
-    generatePaymentLinkFunction: (0, import_fields36.text)({
+    generatePaymentLinkFunction: (0, import_fields38.text)({
       validation: { isRequired: true },
       ui: {
         description: "Name of the adapter function to generate payment dashboard links"
       }
     }),
-    handleWebhookFunction: (0, import_fields36.text)({
+    handleWebhookFunction: (0, import_fields38.text)({
       validation: { isRequired: true },
       ui: {
         description: "Name of the adapter function to handle provider webhooks"
       }
     }),
-    sessions: (0, import_fields36.relationship)({
+    sessions: (0, import_fields38.relationship)({
       ref: "PaymentSession.paymentProvider",
       many: true
     }),
@@ -1869,24 +1941,25 @@ var PaymentProvider = (0, import_core36.list)({
 });
 
 // features/keystone/models/domainRelations.ts
-var import_fields37 = require("@keystone-6/core/fields");
+var import_fields39 = require("@keystone-6/core/fields");
 var userDomainRelations = {
-  event_promoter: (0, import_fields37.relationship)({ ref: "Event.promoter", many: true }),
-  inventoryHold_customer: (0, import_fields37.relationship)({ ref: "InventoryHold.customer", many: true }),
-  ticketOrder_customer: (0, import_fields37.relationship)({ ref: "TicketOrder.customer", many: true }),
-  scanEvent_scannedBy: (0, import_fields37.relationship)({ ref: "ScanEvent.scannedBy", many: true }),
-  settlementLine_approvedBy: (0, import_fields37.relationship)({ ref: "SettlementLine.approvedBy", many: true }),
-  auditEvent_actor: (0, import_fields37.relationship)({ ref: "AuditEvent.actor", many: true }),
-  storeSettings_manager: (0, import_fields37.relationship)({ ref: "StoreSettings.manager", many: true })
+  inquiry_handledBy: (0, import_fields39.relationship)({ ref: "Inquiry.handledBy", many: true }),
+  event_promoter: (0, import_fields39.relationship)({ ref: "Event.promoter", many: true }),
+  inventoryHold_customer: (0, import_fields39.relationship)({ ref: "InventoryHold.customer", many: true }),
+  ticketOrder_customer: (0, import_fields39.relationship)({ ref: "TicketOrder.customer", many: true }),
+  scanEvent_scannedBy: (0, import_fields39.relationship)({ ref: "ScanEvent.scannedBy", many: true }),
+  settlementLine_approvedBy: (0, import_fields39.relationship)({ ref: "SettlementLine.approvedBy", many: true }),
+  auditEvent_actor: (0, import_fields39.relationship)({ ref: "AuditEvent.actor", many: true }),
+  storeSettings_manager: (0, import_fields39.relationship)({ ref: "StoreSettings.manager", many: true })
 };
 var paymentCollectionDomainRelations = {
-  ticketOrder_paymentCollection: (0, import_fields37.relationship)({ ref: "TicketOrder.paymentCollection", many: true })
+  ticketOrder_paymentCollection: (0, import_fields39.relationship)({ ref: "TicketOrder.paymentCollection", many: true })
 };
 
 // features/keystone/models/PaymentCollection.ts
-var import_core37 = require("@keystone-6/core");
-var import_fields38 = require("@keystone-6/core/fields");
-var PaymentCollection = (0, import_core37.list)({
+var import_core39 = require("@keystone-6/core");
+var import_fields40 = require("@keystone-6/core/fields");
+var PaymentCollection = (0, import_core39.list)({
   access: {
     operation: {
       query: ({ session }) => permissions.canManageOrders({ session }),
@@ -1896,7 +1969,7 @@ var PaymentCollection = (0, import_core37.list)({
     }
   },
   fields: {
-    description: (0, import_fields38.select)({
+    description: (0, import_fields40.select)({
       type: "enum",
       options: [
         { label: "Default", value: "default" },
@@ -1904,21 +1977,21 @@ var PaymentCollection = (0, import_core37.list)({
       ],
       defaultValue: "default"
     }),
-    amount: (0, import_fields38.integer)({
+    amount: (0, import_fields40.integer)({
       validation: { isRequired: true }
     }),
-    authorizedAmount: (0, import_fields38.integer)({
+    authorizedAmount: (0, import_fields40.integer)({
       defaultValue: 0
     }),
-    refundedAmount: (0, import_fields38.integer)({
+    refundedAmount: (0, import_fields40.integer)({
       defaultValue: 0
     }),
-    metadata: (0, import_fields38.json)(),
-    paymentSessions: (0, import_fields38.relationship)({
+    metadata: (0, import_fields40.json)(),
+    paymentSessions: (0, import_fields40.relationship)({
       ref: "PaymentSession.paymentCollection",
       many: true
     }),
-    payments: (0, import_fields38.relationship)({
+    payments: (0, import_fields40.relationship)({
       ref: "Payment.paymentCollection",
       many: true
     }),
@@ -1928,9 +2001,9 @@ var PaymentCollection = (0, import_core37.list)({
 });
 
 // features/keystone/models/PaymentSession.ts
-var import_core38 = require("@keystone-6/core");
-var import_fields39 = require("@keystone-6/core/fields");
-var PaymentSession = (0, import_core38.list)({
+var import_core40 = require("@keystone-6/core");
+var import_fields41 = require("@keystone-6/core/fields");
+var PaymentSession = (0, import_core40.list)({
   access: {
     operation: {
       query: ({ session }) => permissions.canManageOrders({ session }),
@@ -1940,41 +2013,41 @@ var PaymentSession = (0, import_core38.list)({
     }
   },
   fields: {
-    isSelected: (0, import_fields39.checkbox)({
+    isSelected: (0, import_fields41.checkbox)({
       defaultValue: false
     }),
-    isInitiated: (0, import_fields39.checkbox)({
+    isInitiated: (0, import_fields41.checkbox)({
       defaultValue: false
     }),
-    amount: (0, import_fields39.integer)({
+    amount: (0, import_fields41.integer)({
       validation: { isRequired: true }
     }),
     // Holds the provider's clientSecret while a payment is pending: only payment managers read it.
-    data: (0, import_fields39.json)({
+    data: (0, import_fields41.json)({
       defaultValue: {},
       access: { read: permissions.canManagePayments, create: () => false, update: () => false },
       ui: { listView: { fieldMode: (a) => permissions.canManagePayments(a) ? "read" : "hidden" }, itemView: { fieldMode: (a) => permissions.canManagePayments(a) ? "read" : "hidden" } }
     }),
-    idempotencyKey: (0, import_fields39.text)({
+    idempotencyKey: (0, import_fields41.text)({
       validation: { isRequired: true },
       isIndexed: "unique"
     }),
-    paymentCollection: (0, import_fields39.relationship)({
+    paymentCollection: (0, import_fields41.relationship)({
       ref: "PaymentCollection.paymentSessions"
     }),
-    paymentProvider: (0, import_fields39.relationship)({
+    paymentProvider: (0, import_fields41.relationship)({
       ref: "PaymentProvider.sessions",
       many: false
     }),
-    paymentAuthorizedAt: (0, import_fields39.timestamp)(),
+    paymentAuthorizedAt: (0, import_fields41.timestamp)(),
     ...trackingFields
   }
 });
 
 // features/keystone/models/Payment.ts
-var import_core39 = require("@keystone-6/core");
-var import_fields40 = require("@keystone-6/core/fields");
-var Payment = (0, import_core39.list)({
+var import_core41 = require("@keystone-6/core");
+var import_fields42 = require("@keystone-6/core/fields");
+var Payment = (0, import_core41.list)({
   access: {
     operation: {
       query: ({ session }) => permissions.canReadPayments({ session }) || permissions.canManagePayments({ session }),
@@ -1989,21 +2062,21 @@ var Payment = (0, import_core39.list)({
     }
   },
   fields: {
-    idempotencyKey: (0, import_fields40.text)({ validation: { isRequired: true }, isIndexed: "unique" }),
-    reservedAt: (0, import_fields40.timestamp)(),
-    refundedAmount: (0, import_fields40.integer)({ defaultValue: 0, validation: { min: 0 } }),
-    amount: (0, import_fields40.integer)({
+    idempotencyKey: (0, import_fields42.text)({ validation: { isRequired: true }, isIndexed: "unique" }),
+    reservedAt: (0, import_fields42.timestamp)(),
+    refundedAmount: (0, import_fields42.integer)({ defaultValue: 0, validation: { min: 0 } }),
+    amount: (0, import_fields42.integer)({
       validation: { isRequired: true },
       ui: {
         description: "Payment amount in cents"
       }
     }),
-    data: (0, import_fields40.json)({
+    data: (0, import_fields42.json)({
       ui: {
         description: "Payment provider data (clientSecret, paymentIntentId, orderId, etc.)"
       }
     }),
-    currencyCode: (0, import_fields40.text)({
+    currencyCode: (0, import_fields42.text)({
       defaultValue: "USD",
       ui: { description: "ISO 4217 currency code for this payment" },
       hooks: {
@@ -2019,7 +2092,7 @@ var Payment = (0, import_core39.list)({
         }
       }
     }),
-    status: (0, import_fields40.select)({
+    status: (0, import_fields42.select)({
       type: "string",
       options: [
         { label: "Pending", value: "pending" },
@@ -2035,7 +2108,7 @@ var Payment = (0, import_core39.list)({
       defaultValue: "pending",
       validation: { isRequired: true }
     }),
-    paymentMethod: (0, import_fields40.select)({
+    paymentMethod: (0, import_fields42.select)({
       type: "string",
       options: [
         { label: "Credit Card", value: "credit_card" },
@@ -2048,85 +2121,85 @@ var Payment = (0, import_core39.list)({
       ],
       defaultValue: "credit_card"
     }),
-    paymentProvider: (0, import_fields40.relationship)({
+    paymentProvider: (0, import_fields42.relationship)({
       ref: "PaymentProvider",
       ui: {
         displayMode: "select",
         description: "Optional provider backing this payment"
       }
     }),
-    providerPaymentId: (0, import_fields40.text)({
+    providerPaymentId: (0, import_fields42.text)({
       ui: {
         description: "Provider payment identifier (Stripe/PayPal/etc.)"
       }
     }),
     // Card details (last 4 digits for reference)
-    cardLast4: (0, import_fields40.text)({
+    cardLast4: (0, import_fields42.text)({
       ui: {
         description: "Last 4 digits of card"
       }
     }),
-    cardBrand: (0, import_fields40.text)({
+    cardBrand: (0, import_fields42.text)({
       ui: {
         description: "Card brand (visa, mastercard, etc.)"
       }
     }),
     // Tip handling
-    tipAmount: (0, import_fields40.integer)({
+    tipAmount: (0, import_fields42.integer)({
       defaultValue: 0,
       ui: {
         description: "Tip amount included in payment in cents"
       }
     }),
     // Split payment support
-    isSplitPayment: (0, import_fields40.checkbox)({
+    isSplitPayment: (0, import_fields42.checkbox)({
       defaultValue: false,
       ui: {
         description: "Whether this payment is part of a split bill"
       }
     }),
-    splitPaymentIndex: (0, import_fields40.integer)({
+    splitPaymentIndex: (0, import_fields42.integer)({
       ui: {
         description: "Index of this payment in split (1, 2, 3, etc.)"
       }
     }),
-    splitTotal: (0, import_fields40.integer)({
+    splitTotal: (0, import_fields42.integer)({
       ui: {
         description: "Total number of split payments for this order"
       }
     }),
-    processedAt: (0, import_fields40.timestamp)({
+    processedAt: (0, import_fields42.timestamp)({
       ui: {
         description: "When payment was successfully processed"
       }
     }),
     // Metadata for errors or additional info
-    errorMessage: (0, import_fields40.text)({
+    errorMessage: (0, import_fields42.text)({
       ui: {
         description: "Error message if payment failed"
       }
     }),
-    notes: (0, import_fields40.text)({
+    notes: (0, import_fields42.text)({
       ui: {
         displayMode: "textarea",
         description: "Internal notes about this payment"
       }
     }),
     // Relationships
-    order: (0, import_fields40.relationship)({
+    order: (0, import_fields42.relationship)({
       ref: "TicketOrder.payments",
       ui: {
         displayMode: "select"
       }
     }),
-    paymentCollection: (0, import_fields40.relationship)({
+    paymentCollection: (0, import_fields42.relationship)({
       ref: "PaymentCollection.payments",
       ui: {
         displayMode: "select",
         description: "Payment collection this payment belongs to"
       }
     }),
-    processedBy: (0, import_fields40.relationship)({
+    processedBy: (0, import_fields42.relationship)({
       ref: "User",
       ui: {
         displayMode: "select",
@@ -2138,9 +2211,9 @@ var Payment = (0, import_core39.list)({
 });
 
 // features/keystone/models/Refund.ts
-var import_core40 = require("@keystone-6/core");
-var import_fields41 = require("@keystone-6/core/fields");
-var Refund = (0, import_core40.list)({
+var import_core42 = require("@keystone-6/core");
+var import_fields43 = require("@keystone-6/core/fields");
+var Refund = (0, import_core42.list)({
   access: {
     operation: {
       query: ({ session }) => permissions.canReadPayments({ session }) || permissions.canManagePayments({ session }),
@@ -2150,10 +2223,10 @@ var Refund = (0, import_core40.list)({
     }
   },
   fields: {
-    idempotencyKey: (0, import_fields41.text)({ validation: { isRequired: true }, isIndexed: "unique" }),
-    amount: (0, import_fields41.integer)({ validation: { isRequired: true, min: 1 } }),
-    currencyCode: (0, import_fields41.text)({ validation: { isRequired: true } }),
-    status: (0, import_fields41.select)({
+    idempotencyKey: (0, import_fields43.text)({ validation: { isRequired: true }, isIndexed: "unique" }),
+    amount: (0, import_fields43.integer)({ validation: { isRequired: true, min: 1 } }),
+    currencyCode: (0, import_fields43.text)({ validation: { isRequired: true } }),
+    status: (0, import_fields43.select)({
       type: "string",
       options: [
         { label: "Processing", value: "processing" },
@@ -2164,22 +2237,22 @@ var Refund = (0, import_core40.list)({
       defaultValue: "processing",
       validation: { isRequired: true }
     }),
-    reason: (0, import_fields41.text)({ validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
-    providerRefundId: (0, import_fields41.text)(),
-    providerData: (0, import_fields41.json)(),
-    processedAt: (0, import_fields41.timestamp)(),
-    payment: (0, import_fields41.relationship)({ ref: "Payment" }),
-    order: (0, import_fields41.relationship)({ ref: "TicketOrder" }),
-    requestedBy: (0, import_fields41.relationship)({ ref: "User" }),
-    approvedBy: (0, import_fields41.relationship)({ ref: "User" }),
+    reason: (0, import_fields43.text)({ validation: { isRequired: true }, ui: { displayMode: "textarea" } }),
+    providerRefundId: (0, import_fields43.text)(),
+    providerData: (0, import_fields43.json)(),
+    processedAt: (0, import_fields43.timestamp)(),
+    payment: (0, import_fields43.relationship)({ ref: "Payment" }),
+    order: (0, import_fields43.relationship)({ ref: "TicketOrder" }),
+    requestedBy: (0, import_fields43.relationship)({ ref: "User" }),
+    approvedBy: (0, import_fields43.relationship)({ ref: "User" }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/PaymentWebhookEvent.ts
-var import_core41 = require("@keystone-6/core");
-var import_fields42 = require("@keystone-6/core/fields");
-var PaymentWebhookEvent = (0, import_core41.list)({
+var import_core43 = require("@keystone-6/core");
+var import_fields44 = require("@keystone-6/core/fields");
+var PaymentWebhookEvent = (0, import_core43.list)({
   access: {
     operation: {
       query: permissions.canManagePayments,
@@ -2189,11 +2262,11 @@ var PaymentWebhookEvent = (0, import_core41.list)({
     }
   },
   fields: {
-    eventKey: (0, import_fields42.text)({ validation: { isRequired: true }, isIndexed: "unique" }),
-    providerCode: (0, import_fields42.text)({ validation: { isRequired: true }, isIndexed: true }),
-    providerEventId: (0, import_fields42.text)({ isIndexed: true }),
-    eventType: (0, import_fields42.text)({ isIndexed: true }),
-    status: (0, import_fields42.select)({
+    eventKey: (0, import_fields44.text)({ validation: { isRequired: true }, isIndexed: "unique" }),
+    providerCode: (0, import_fields44.text)({ validation: { isRequired: true }, isIndexed: true }),
+    providerEventId: (0, import_fields44.text)({ isIndexed: true }),
+    eventType: (0, import_fields44.text)({ isIndexed: true }),
+    status: (0, import_fields44.select)({
       type: "string",
       options: [
         { label: "Received", value: "received" },
@@ -2203,21 +2276,21 @@ var PaymentWebhookEvent = (0, import_core41.list)({
       ],
       defaultValue: "received"
     }),
-    payload: (0, import_fields42.json)(),
-    rawBody: (0, import_fields42.text)({ ui: { displayMode: "textarea" } }),
-    error: (0, import_fields42.text)({ ui: { displayMode: "textarea" } }),
-    attempts: (0, import_fields42.integer)({ defaultValue: 0 }),
-    receivedAt: (0, import_fields42.timestamp)({ defaultValue: { kind: "now" }, isIndexed: true }),
-    processedAt: (0, import_fields42.timestamp)(),
-    payment: (0, import_fields42.relationship)({ ref: "Payment" }),
+    payload: (0, import_fields44.json)(),
+    rawBody: (0, import_fields44.text)({ ui: { displayMode: "textarea" } }),
+    error: (0, import_fields44.text)({ ui: { displayMode: "textarea" } }),
+    attempts: (0, import_fields44.integer)({ defaultValue: 0 }),
+    receivedAt: (0, import_fields44.timestamp)({ defaultValue: { kind: "now" }, isIndexed: true }),
+    processedAt: (0, import_fields44.timestamp)(),
+    payment: (0, import_fields44.relationship)({ ref: "Payment" }),
     ...trackingFields
   }
 });
 
 // features/keystone/models/IdempotencyKey.ts
-var import_core42 = require("@keystone-6/core");
-var import_fields43 = require("@keystone-6/core/fields");
-var IdempotencyKey = (0, import_core42.list)({
+var import_core44 = require("@keystone-6/core");
+var import_fields45 = require("@keystone-6/core/fields");
+var IdempotencyKey = (0, import_core44.list)({
   access: {
     operation: {
       query: () => false,
@@ -2228,71 +2301,71 @@ var IdempotencyKey = (0, import_core42.list)({
   },
   ui: { isHidden: true },
   fields: {
-    idempotencyKey: (0, import_fields43.text)({
+    idempotencyKey: (0, import_fields45.text)({
       isIndexed: "unique",
       validation: { isRequired: true }
     }),
-    requestMethod: (0, import_fields43.text)({ validation: { isRequired: true } }),
-    requestParams: (0, import_fields43.json)(),
-    requestPath: (0, import_fields43.text)({ validation: { isRequired: true } }),
-    responseCode: (0, import_fields43.integer)(),
-    responseBody: (0, import_fields43.json)(),
-    recoveryPoint: (0, import_fields43.text)({
+    requestMethod: (0, import_fields45.text)({ validation: { isRequired: true } }),
+    requestParams: (0, import_fields45.json)(),
+    requestPath: (0, import_fields45.text)({ validation: { isRequired: true } }),
+    responseCode: (0, import_fields45.integer)(),
+    responseBody: (0, import_fields45.json)(),
+    recoveryPoint: (0, import_fields45.text)({
       defaultValue: "started",
       validation: { isRequired: true }
     }),
-    lockedAt: (0, import_fields43.timestamp)(),
+    lockedAt: (0, import_fields45.timestamp)(),
     ...trackingFields
   }
 });
 
 // features/keystone/models/ManagerApproval.ts
-var import_core43 = require("@keystone-6/core");
-var import_fields44 = require("@keystone-6/core/fields");
-var ManagerApproval = (0, import_core43.list)({
+var import_core45 = require("@keystone-6/core");
+var import_fields46 = require("@keystone-6/core/fields");
+var ManagerApproval = (0, import_core45.list)({
   access: { operation: { query: ({ session }) => permissions.canIssueRefunds({ session }) || permissions.canApproveAdjustments({ session }), create: () => false, update: () => false, delete: () => false } },
   fields: {
-    actionType: (0, import_fields44.select)({ type: "string", options: ["refund_payment", "cash_refund"], validation: { isRequired: true }, isIndexed: true }),
-    targetId: (0, import_fields44.text)({ validation: { isRequired: true }, isIndexed: true }),
-    reason: (0, import_fields44.text)({ validation: { isRequired: true } }),
-    amount: (0, import_fields44.integer)(),
-    requestFingerprint: (0, import_fields44.text)({ validation: { isRequired: true } }),
-    requestPayload: (0, import_fields44.json)(),
-    status: (0, import_fields44.select)({ type: "string", options: ["pending", "approved", "rejected", "consumed", "expired"], defaultValue: "pending", validation: { isRequired: true }, isIndexed: true }),
-    approvedAt: (0, import_fields44.timestamp)(),
-    consumedAt: (0, import_fields44.timestamp)(),
-    expiresAt: (0, import_fields44.timestamp)({ validation: { isRequired: true }, isIndexed: true }),
-    consumedEntityType: (0, import_fields44.text)(),
-    consumedEntityId: (0, import_fields44.text)(),
-    requestedBy: (0, import_fields44.relationship)({ ref: "User" }),
-    approvedBy: (0, import_fields44.relationship)({ ref: "User" }),
+    actionType: (0, import_fields46.select)({ type: "string", options: ["refund_payment", "cash_refund"], validation: { isRequired: true }, isIndexed: true }),
+    targetId: (0, import_fields46.text)({ validation: { isRequired: true }, isIndexed: true }),
+    reason: (0, import_fields46.text)({ validation: { isRequired: true } }),
+    amount: (0, import_fields46.integer)(),
+    requestFingerprint: (0, import_fields46.text)({ validation: { isRequired: true } }),
+    requestPayload: (0, import_fields46.json)(),
+    status: (0, import_fields46.select)({ type: "string", options: ["pending", "approved", "rejected", "consumed", "expired"], defaultValue: "pending", validation: { isRequired: true }, isIndexed: true }),
+    approvedAt: (0, import_fields46.timestamp)(),
+    consumedAt: (0, import_fields46.timestamp)(),
+    expiresAt: (0, import_fields46.timestamp)({ validation: { isRequired: true }, isIndexed: true }),
+    consumedEntityType: (0, import_fields46.text)(),
+    consumedEntityId: (0, import_fields46.text)(),
+    requestedBy: (0, import_fields46.relationship)({ ref: "User" }),
+    approvedBy: (0, import_fields46.relationship)({ ref: "User" }),
     ...trackingFields
   },
   ui: { isHidden: true }
 });
 
 // features/keystone/models/CashDrawer.ts
-var import_core44 = require("@keystone-6/core");
-var import_fields45 = require("@keystone-6/core/fields");
-var CashDrawer = (0, import_core44.list)({
+var import_core46 = require("@keystone-6/core");
+var import_fields47 = require("@keystone-6/core/fields");
+var CashDrawer = (0, import_core46.list)({
   access: { operation: { query: ({ session }) => permissions.canManageOrders({ session }) || permissions.canReadPayments({ session }), create: () => false, update: () => false, delete: () => false } },
   fields: {
-    label: (0, import_fields45.text)({ validation: { isRequired: true } }),
-    status: (0, import_fields45.select)({ type: "string", options: ["open", "closed"], defaultValue: "open", validation: { isRequired: true }, isIndexed: true }),
-    openKey: (0, import_fields45.text)({ isIndexed: "unique", db: { isNullable: true } }),
-    openingFloatCents: (0, import_fields45.integer)({ validation: { isRequired: true } }),
-    cashSalesCents: (0, import_fields45.integer)({ defaultValue: 0 }),
-    cashRefundsCents: (0, import_fields45.integer)({ defaultValue: 0 }),
-    expectedCents: (0, import_fields45.integer)(),
-    countedCents: (0, import_fields45.integer)(),
-    varianceCents: (0, import_fields45.integer)(),
-    varianceReason: (0, import_fields45.text)(),
-    count: (0, import_fields45.json)(),
-    openedAt: (0, import_fields45.timestamp)({ validation: { isRequired: true } }),
-    closedAt: (0, import_fields45.timestamp)(),
-    openedBy: (0, import_fields45.relationship)({ ref: "User" }),
-    closedBy: (0, import_fields45.relationship)({ ref: "User" }),
-    currencyCode: (0, import_fields45.text)({ defaultValue: "USD" }),
+    label: (0, import_fields47.text)({ validation: { isRequired: true } }),
+    status: (0, import_fields47.select)({ type: "string", options: ["open", "closed"], defaultValue: "open", validation: { isRequired: true }, isIndexed: true }),
+    openKey: (0, import_fields47.text)({ isIndexed: "unique", db: { isNullable: true } }),
+    openingFloatCents: (0, import_fields47.integer)({ validation: { isRequired: true } }),
+    cashSalesCents: (0, import_fields47.integer)({ defaultValue: 0 }),
+    cashRefundsCents: (0, import_fields47.integer)({ defaultValue: 0 }),
+    expectedCents: (0, import_fields47.integer)(),
+    countedCents: (0, import_fields47.integer)(),
+    varianceCents: (0, import_fields47.integer)(),
+    varianceReason: (0, import_fields47.text)(),
+    count: (0, import_fields47.json)(),
+    openedAt: (0, import_fields47.timestamp)({ validation: { isRequired: true } }),
+    closedAt: (0, import_fields47.timestamp)(),
+    openedBy: (0, import_fields47.relationship)({ ref: "User" }),
+    closedBy: (0, import_fields47.relationship)({ ref: "User" }),
+    currencyCode: (0, import_fields47.text)({ defaultValue: "USD" }),
     ...trackingFields
   },
   ui: { isHidden: true }
@@ -2309,10 +2382,10 @@ async function passes(gate, args, extra = {}) {
     return false;
   }
 }
-async function canReadWholeList(list43, args) {
-  if (!list43) return false;
-  if (!await passes(operationGate(list43.access), args)) return false;
-  const rowFilter = list43.access?.filter?.query;
+async function canReadWholeList(list45, args) {
+  if (!list45) return false;
+  if (!await passes(operationGate(list45.access), args)) return false;
+  const rowFilter = list45.access?.filter?.query;
   if (typeof rowFilter !== "function") return true;
   try {
     return await rowFilter({ ...args, operation: "query" }) === true;
@@ -2321,9 +2394,9 @@ async function canReadWholeList(list43, args) {
   }
 }
 function filterFollowsRead(lists) {
-  return Object.fromEntries(Object.entries(lists).map(([listKey, list43]) => [listKey, {
-    ...list43,
-    fields: Object.fromEntries(Object.entries(list43.fields).map(([fieldKey, field]) => {
+  return Object.fromEntries(Object.entries(lists).map(([listKey, list45]) => [listKey, {
+    ...list45,
+    fields: Object.fromEntries(Object.entries(list45.fields).map(([fieldKey, field]) => {
       if (typeof field !== "function" || fieldKey.startsWith("__group")) return [fieldKey, field];
       return [fieldKey, (data) => {
         const f = field(data);
@@ -2331,7 +2404,7 @@ function filterFollowsRead(lists) {
         const own = f.isFilterable;
         const ownOrder = f.isOrderable;
         const allowed = async (args) => {
-          if (!await passes(operationGate(list43.access), args)) return false;
+          if (!await passes(operationGate(list45.access), args)) return false;
           if (!await passes(fieldReadGate(f.access), args, { listKey, fieldKey, item: void 0 })) return false;
           if (target && !await canReadWholeList(lists[target], args)) return false;
           return true;
@@ -2347,7 +2420,7 @@ function filterFollowsRead(lists) {
 }
 
 // features/keystone/models/index.ts
-var baseModels = { User, Role, OAuthApp, OAuthToken, Room, SeatingChart, ChartSection, Seat, Agency, Artist, Event, EventArtist, DateHold, Offer, EventExpense, PriceLevel, PriceLevelPhase, SeatInventory, ProductionHold, InventoryHold, PromoCode, PromoRedemption, TicketOrder, TicketOrderLine, Ticket, ScanEvent, MerchSales, BarSales, Settlement, SettlementLine, ArtistPayment, AuditEvent, StoreSettings, PaymentProvider, PaymentCollection, PaymentSession, Payment, Refund, PaymentWebhookEvent, IdempotencyKey, ManagerApproval, CashDrawer };
+var baseModels = { User, Role, OAuthApp, OAuthToken, Room, SeatingChart, ChartSection, Seat, Agency, Artist, Event, EventArtist, DateHold, Promoter, Inquiry, Offer, EventExpense, PriceLevel, PriceLevelPhase, SeatInventory, ProductionHold, InventoryHold, PromoCode, PromoRedemption, TicketOrder, TicketOrderLine, Ticket, ScanEvent, MerchSales, BarSales, Settlement, SettlementLine, ArtistPayment, AuditEvent, StoreSettings, PaymentProvider, PaymentCollection, PaymentSession, Payment, Refund, PaymentWebhookEvent, IdempotencyKey, ManagerApproval, CashDrawer };
 var allModels = filterFollowsRead(baseModels);
 var narrowed = (config2) => {
   const operation = config2.access?.operation ?? {};
@@ -2578,12 +2651,12 @@ function canonicalJson(value) {
 var canonicalDigest = (value) => digest(canonicalJson(value));
 
 // features/keystone/lib/settlement.ts
-function integer38(value, label, max = Number.MAX_SAFE_INTEGER) {
+function integer39(value, label, max = Number.MAX_SAFE_INTEGER) {
   if (!Number.isSafeInteger(value) || value < 0 || value > max) throw new Error(`${label} must be a non-negative safe integer`);
   return value;
 }
 function percentage(amount, bps2) {
-  integer38(bps2, "Basis points", 1e4);
+  integer39(bps2, "Basis points", 1e4);
   if (!Number.isSafeInteger(amount)) throw new Error("Amount must be safe integer cents");
   const product = BigInt(amount) * BigInt(bps2);
   const zero = BigInt(0), d = BigInt(1e4);
@@ -2591,7 +2664,7 @@ function percentage(amount, bps2) {
   return { cents: Number(cents2), remainder: Number(product - cents2 * d) };
 }
 function computeSettlement(input) {
-  for (const [key, value] of Object.entries(input)) if (key !== "dealType" && value !== void 0) integer38(value, key, key.endsWith("Bps") ? 1e4 : Number.MAX_SAFE_INTEGER);
+  for (const [key, value] of Object.entries(input)) if (key !== "dealType" && value !== void 0) integer39(value, key, key.endsWith("Bps") ? 1e4 : Number.MAX_SAFE_INTEGER);
   const netBoxOfficeCents = input.grossCents - input.taxCents - input.passthroughFeesCents;
   const cappedExpensesCents = Math.min(input.cappedExpensesCents, input.expenseCapCents);
   const totalExpensesCents = cappedExpensesCents + input.uncappedExpensesCents;
@@ -2608,7 +2681,7 @@ function computeSettlement(input) {
   return { ...result, rounding: [{ label: "Promoter profit", numerator: profit.remainder }, { label: "Artist split", numerator: share.remainder }, { label: "Soft merchandise", numerator: soft.remainder }, { label: "Hard merchandise", numerator: hard.remainder }] };
 }
 function ticketQuote(input) {
-  for (const [k, v] of Object.entries(input)) integer38(v, k, k.endsWith("Bps") ? 1e4 : Number.MAX_SAFE_INTEGER);
+  for (const [k, v] of Object.entries(input)) integer39(v, k, k.endsWith("Bps") ? 1e4 : Number.MAX_SAFE_INTEGER);
   if (input.quantity < 1 || input.quantity > 100) throw new Error("Invalid quantity");
   const subtotalCents = input.priceCents * input.quantity;
   const serviceFeesCents = input.feeCents * input.quantity;
@@ -2618,8 +2691,8 @@ function ticketQuote(input) {
   return { subtotalCents, serviceFeesCents, facilityFeesCents, discountCents, taxCents, totalCents: subtotalCents + serviceFeesCents + facilityFeesCents - discountCents + taxCents };
 }
 function refundableCents(totalCents, refundedCents) {
-  integer38(totalCents, "Total");
-  integer38(refundedCents, "Refunded");
+  integer39(totalCents, "Total");
+  integer39(refundedCents, "Refunded");
   if (refundedCents > totalCents) throw new Error("Refund exceeds order");
   return totalCents - refundedCents;
 }
@@ -2722,9 +2795,9 @@ var eventTransitions = {
 };
 function assertEventTransition(current, next, reason, showAt, now = /* @__PURE__ */ new Date()) {
   if (!eventTransitions[current]?.includes(next)) throw new Error(`Cannot move event from ${current} to ${next}`);
-  const at3 = showAt ? new Date(showAt).getTime() : NaN;
-  if (Number.isFinite(at3)) {
-    const hours = (at3 - now.getTime()) / 36e5;
+  const at4 = showAt ? new Date(showAt).getTime() : NaN;
+  if (Number.isFinite(at4)) {
+    const hours = (at4 - now.getTime()) / 36e5;
     if (next === "doors" && (hours > 12 || hours < -12)) throw new Error(hours > 0 ? "Doors open within 12 hours of the show" : "This show has passed; complete it instead of opening doors");
     if (next === "completed" && hours > 0) throw new Error("A show can be completed only after it starts");
   }
@@ -2769,10 +2842,10 @@ function bps(value, label) {
   return value;
 }
 function name(value, label, max = 120) {
-  const text42 = String(value ?? "").trim();
-  if (!text42) throw new Error(`${label} required`);
-  if (text42.length > max) throw new Error(`${label} is too long`);
-  return text42;
+  const text44 = String(value ?? "").trim();
+  if (!text44) throw new Error(`${label} required`);
+  if (text44.length > max) throw new Error(`${label} is too long`);
+  return text44;
 }
 function optionalDate(value, label) {
   if (value === void 0 || value === null || value === "") return null;
@@ -2867,6 +2940,155 @@ function validateCounts(lines) {
   });
 }
 
+// features/keystone/lib/hold-rules.ts
+var DEFAULT_HOLD_SETTINGS = { challengeBusinessDays: 1, challengeCountsWeekends: false, holdExpiryDays: 7 };
+var HOLD_KINDS = ["show", "rental", "private_event", "internal"];
+function holdSettingsOf(row) {
+  return {
+    challengeBusinessDays: Number.isInteger(row?.challengeBusinessDays) && row.challengeBusinessDays >= 0 ? row.challengeBusinessDays : DEFAULT_HOLD_SETTINGS.challengeBusinessDays,
+    challengeCountsWeekends: row?.challengeCountsWeekends ?? DEFAULT_HOLD_SETTINGS.challengeCountsWeekends,
+    holdExpiryDays: Number.isInteger(row?.holdExpiryDays) && row.holdExpiryDays >= 1 ? row.holdExpiryDays : DEFAULT_HOLD_SETTINGS.holdExpiryDays
+  };
+}
+function wallClock(instant, timeZone) {
+  const p2 = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(instant).map((x) => [x.type, x.value]));
+  return { year: +p2.year, month: +p2.month, day: +p2.day, hour: +p2.hour, minute: +p2.minute };
+}
+function challengeDeadline(from, settings, timeZone) {
+  const zone = timeZone || "UTC";
+  const local = wallClock(from, zone);
+  if (settings.challengeBusinessDays <= 0) return new Date(from);
+  const cursor = new Date(Date.UTC(local.year, local.month - 1, local.day));
+  let remaining = settings.challengeBusinessDays;
+  while (remaining > 0) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    const weekday = cursor.getUTCDay();
+    if (settings.challengeCountsWeekends || weekday !== 0 && weekday !== 6) remaining -= 1;
+  }
+  const hh = String(local.hour).padStart(2, "0");
+  const mm = String(local.minute).padStart(2, "0");
+  return zonedDateTime(cursor.toISOString().slice(0, 10), `${hh}:${mm}`, zone);
+}
+var at = (value) => value ? new Date(value) : null;
+function lapseReason(hold, now) {
+  if (!["held", "challenged"].includes(hold.status)) return null;
+  if (+new Date(hold.expiresAt) <= +now) return "Hold expired";
+  const deadline = at(hold.challengeDeadline);
+  if (hold.status === "challenged" && deadline && +deadline <= +now) return "Did not confirm by the challenge deadline";
+  return null;
+}
+var isLive = (hold, now) => ["held", "challenged"].includes(hold.status) && !lapseReason(hold, now);
+function dayState(holds, hasConfirmedEvent, now) {
+  if (hasConfirmedEvent || holds.some((h) => h.status === "confirmed")) return "booked";
+  return holds.some((h) => isLive(h, now)) ? "held" : "open";
+}
+
+// features/keystone/mutations/calendar.ts
+var LIVE = ["held", "challenged"];
+async function holdSettings(tx) {
+  return holdSettingsOf(await tx.storeSettings.findFirst({ orderBy: { createdAt: "asc" } }));
+}
+async function settleDay(tx, roomId, date, actor, now = /* @__PURE__ */ new Date()) {
+  const holds = await tx.dateHold.findMany({ where: { roomId, date, status: { in: LIVE } }, orderBy: { rank: "asc" } });
+  const released = [];
+  for (const hold of holds) {
+    const reason = lapseReason(hold, now);
+    if (!reason) continue;
+    await transition(tx, "dateHold", hold.id, hold.status, "released", actor, reason, { rankKey: null, releasedReason: reason });
+    released.push(hold.id);
+  }
+  const live = await tx.dateHold.findMany({ where: { roomId, date, status: { in: LIVE } } });
+  const liveIds = new Set(live.map((h) => h.id));
+  for (const hold of live) {
+    if (hold.status === "challenged" && (!hold.challengedById || !liveIds.has(hold.challengedById))) {
+      await transition(tx, "dateHold", hold.id, "challenged", "held", actor, "Challenger is no longer holding the date", { challengeDeadline: null, challengedById: null });
+    }
+  }
+  return released;
+}
+async function runHoldCommand(operation, tx, input, actor) {
+  const now = /* @__PURE__ */ new Date();
+  const audit = (id, after, reason = "") => appendAuditEvent(tx, actor, { action: operation, targetList: "DateHold", targetId: id, after, reason });
+  if (operation === "placeDateHold") {
+    const date = new Date(input.date);
+    if (Number.isNaN(+date) || !Number.isInteger(input.rank) || input.rank < 1) throw new Error("Valid date and positive rank required");
+    const room = input.roomId ? await tx.room.findUnique({ where: { id: input.roomId } }) : null;
+    if (!room) throw new Error("Room required");
+    const kind = input.kind || "show";
+    if (!HOLD_KINDS.includes(kind)) throw new Error("Unknown hold kind");
+    if (date < new Date(holdDay(now.toISOString()))) throw new Error("Date is in the past");
+    if (input.artistId && !await tx.artist.findUnique({ where: { id: input.artistId } })) throw new Error("Artist not found");
+    if (input.promoterId && !await tx.promoter.findUnique({ where: { id: input.promoterId } })) throw new Error("Promoter not found");
+    if (kind === "rental" && !input.promoterId) throw new Error("A rental needs a promoter");
+    const settings = await holdSettings(tx);
+    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : new Date(+now + settings.holdExpiryDays * 864e5);
+    if (Number.isNaN(+expiresAt) || expiresAt <= now) throw new Error("Expiry must be in the future");
+    await settleDay(tx, room.id, date, actor, now);
+    if (await tx.dateHold.count({ where: { roomId: room.id, date, status: "confirmed" } })) throw new Error("Date is already confirmed");
+    const rankKey = `${room.id}:${date.toISOString().slice(0, 10)}:${input.rank}`;
+    if (await tx.dateHold.findUnique({ where: { rankKey } })) throw new Error(`Rank ${input.rank} is already held for this date`);
+    const row2 = await tx.dateHold.create({ data: { roomId: room.id, date, kind, artistId: input.artistId || null, agencyId: input.agencyId || null, promoterId: input.promoterId || null, notes: String(input.notes || ""), rank: input.rank, rankKey, status: "held", expiresAt } });
+    await audit(row2.id, { rank: row2.rank, kind });
+    return { id: row2.id, status: row2.status };
+  }
+  const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
+  if (!row) throw new Error("Date hold not found");
+  const lapsed = await settleDay(tx, row.roomId, row.date, actor, now);
+  if (operation === "releaseDateHold") {
+    const fresh = await tx.dateHold.findUnique({ where: { id: row.id } });
+    if (!["held", "challenged"].includes(fresh.status)) {
+      if (lapsed.includes(row.id)) return { id: row.id, status: "released" };
+      throw new Error("Only an unconfirmed hold can be released");
+    }
+    const reason = input.reason || "Released by staff";
+    await transition(tx, "dateHold", fresh.id, fresh.status, "released", actor, reason, { rankKey: null, releasedReason: reason });
+    await settleDay(tx, row.roomId, row.date, actor, now);
+    return { id: row.id, status: "released" };
+  }
+  if (operation === "challengeHold") {
+    const challenger = input.byHoldId ? await tx.dateHold.findUnique({ where: { id: input.byHoldId } }) : null;
+    if (!challenger) throw new Error("The challenging hold is required");
+    if (challenger.roomId !== row.roomId || +challenger.date !== +row.date) throw new Error("Both holds must be for the same room and date");
+    if (challenger.status !== "held") throw new Error("The challenging hold must be a live hold");
+    if (row.status !== "held") throw new Error(row.status === "challenged" ? "That hold is already challenged" : "Hold expired");
+    if (challenger.rank <= row.rank) throw new Error("Only a lower-ranked hold can challenge the hold above it");
+    const room = await tx.room.findUnique({ where: { id: row.roomId } });
+    const settings = await holdSettings(tx);
+    const deadline = challengeDeadline(now, settings, room?.timezone || "UTC");
+    await transition(tx, "dateHold", row.id, "held", "challenged", actor, `Challenged by rank ${challenger.rank}`, { challengeDeadline: deadline, challengedById: challenger.id });
+    await audit(row.id, { challengedBy: challenger.id, challengeDeadline: deadline.toISOString() });
+    return { id: row.id, status: "challenged", challengeDeadline: deadline.toISOString(), challengedBy: challenger.id };
+  }
+  if (operation === "confirmHold") {
+    const fresh = await tx.dateHold.findUnique({ where: { id: row.id } });
+    if (!["held", "challenged"].includes(fresh.status)) throw new Error(fresh.releasedReason ? `Hold cannot be confirmed: ${fresh.releasedReason}` : "Hold cannot be confirmed");
+    if (await tx.dateHold.count({ where: { roomId: row.roomId, date: row.date, status: "confirmed" } })) throw new Error("This date is already confirmed");
+    if (await tx.dateHold.count({ where: { roomId: row.roomId, date: row.date, status: { in: LIVE }, rank: { lt: row.rank } } })) throw new Error("Earlier ranked hold must be released");
+    const room = await tx.room.findUnique({ where: { id: row.roomId } });
+    if (fresh.kind === "internal" || fresh.kind === "private_event") {
+      await transition(tx, "dateHold", row.id, fresh.status, "confirmed", actor, "", { challengeDeadline: null });
+      await audit(row.id, { kind: fresh.kind, status: "confirmed" });
+      return { id: row.id, status: "confirmed" };
+    }
+    const title = String(input.title || "").trim();
+    if (!title) throw new Error("Event title required");
+    const chart = await tx.seatingChart.findUnique({ where: { id: input.seatingChartId } });
+    if (!chart || chart.roomId !== row.roomId || chart.status !== "published") throw new Error("Published room configuration required");
+    if (input.ageRestriction && !["all_ages", "16", "18", "21"].includes(input.ageRestriction)) throw new Error("Unknown age restriction");
+    const day = row.date.toISOString().slice(0, 10);
+    const zone = room?.timezone || "UTC";
+    const showAt = input.showTime ? zonedDateTime(day, input.showTime, zone) : new Date(input.showAt || row.date);
+    const doorsAt = input.doorsTime ? zonedDateTime(day, input.doorsTime, zone) : new Date(input.doorsAt || row.date);
+    if (Number.isNaN(+showAt) || Number.isNaN(+doorsAt) || doorsAt > showAt) throw new Error("Doors must open before the show");
+    const event = await tx.event.create({ data: { title, roomId: row.roomId, seatingChartId: chart.id, showAt, doorsAt, status: "hold", promoterId: actor, ageRestriction: input.ageRestriction || "all_ages" } });
+    await transition(tx, "dateHold", row.id, fresh.status, "confirmed", actor, "", { eventId: event.id, challengeDeadline: null });
+    if (row.artistId) await tx.eventArtist.create({ data: { eventId: event.id, artistId: row.artistId, billing: "headliner", position: 1 } });
+    await appendAuditEvent(tx, actor, { action: operation, targetList: "Event", targetId: event.id, after: { status: "hold" } });
+    return { id: row.id, eventId: event.id, status: "confirmed" };
+  }
+  throw new Error(`Unknown hold command ${operation}`);
+}
+
 // features/keystone/mutations/operators.ts
 function authorize(context, permission) {
   if (!permissions[permission]({ session: context.session })) throw new Error(permissionRefusal(permission));
@@ -2902,56 +3124,8 @@ function operator(operation) {
     if (operation === "placeDateHold") input = { ...input, date: holdDay(input.date) };
     const lock = operation.includes("Hold") && ["placeDateHold", "challengeHold", "confirmHold", "releaseDateHold"].includes(operation) ? `date:${input.roomId}:${String(input.date).slice(0, 10)}` : `event:${eventId}`;
     return command(context, { operation, idempotencyKey: input.idempotencyKey, lock, params: input }, async (tx) => {
-      const audit = async (list43, id, after, reason = "") => appendAuditEvent(tx, actor, { action: operation, targetList: list43, targetId: id, after, reason });
-      if (operation === "placeDateHold") {
-        const date = new Date(input.date);
-        if (Number.isNaN(+date) || !Number.isInteger(input.rank) || input.rank < 1) throw new Error("Valid date and positive rank required");
-        if (!input.roomId || !await tx.room.findUnique({ where: { id: input.roomId } })) throw new Error("Room required");
-        if (date < new Date(holdDay((/* @__PURE__ */ new Date()).toISOString()))) throw new Error("Date is in the past");
-        if (input.artistId && !await tx.artist.findUnique({ where: { id: input.artistId } })) throw new Error("Artist not found");
-        if (input.expiresAt && !(new Date(input.expiresAt) > /* @__PURE__ */ new Date())) throw new Error("Expiry must be in the future");
-        if (await tx.dateHold.count({ where: { roomId: input.roomId, date, status: "confirmed" } })) throw new Error("Date is already confirmed");
-        const lapsed = await tx.dateHold.findMany({ where: { roomId: input.roomId, date, status: { in: ["held", "challenged"] }, expiresAt: { lte: /* @__PURE__ */ new Date() } } });
-        for (const l of lapsed) await transition(tx, "dateHold", l.id, l.status, "released", actor, "Hold expired", { rankKey: null });
-        const rankKey = `${input.roomId}:${date.toISOString().slice(0, 10)}:${input.rank}`;
-        if (await tx.dateHold.findUnique({ where: { rankKey } })) throw new Error(`Rank ${input.rank} is already held for this date`);
-        const row = await tx.dateHold.create({ data: { roomId: input.roomId, date, artistId: input.artistId, agencyId: input.agencyId, rank: input.rank, rankKey, status: "held", expiresAt: input.expiresAt ? new Date(input.expiresAt) : new Date(Date.now() + 6048e5) } });
-        await audit("DateHold", row.id, { rank: row.rank });
-        return { id: row.id, status: row.status };
-      }
-      if (operation === "releaseDateHold") {
-        const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
-        if (!row || !["held", "challenged"].includes(row.status)) throw new Error("Only an unconfirmed hold can be released");
-        await transition(tx, "dateHold", row.id, row.status, "released", actor, input.reason || "Released by staff", { rankKey: null });
-        return { id: row.id, status: "released" };
-      }
-      if (operation === "challengeHold") {
-        const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
-        if (!row || row.expiresAt <= /* @__PURE__ */ new Date()) throw new Error("Hold expired");
-        await transition(tx, "dateHold", row.id, "held", "challenged", actor);
-        return { id: row.id, status: "challenged" };
-      }
-      if (operation === "confirmHold") {
-        const row = await tx.dateHold.findUnique({ where: { id: input.holdId } });
-        if (!row || !["held", "challenged"].includes(row.status) || row.expiresAt <= /* @__PURE__ */ new Date()) throw new Error("Hold cannot be confirmed");
-        const prior = await tx.dateHold.count({ where: { roomId: row.roomId, date: row.date, OR: [{ status: "confirmed" }, { status: { in: ["held", "challenged"] }, expiresAt: { gt: /* @__PURE__ */ new Date() }, rank: { lt: row.rank } }] } });
-        if (prior) throw new Error("Earlier ranked hold must be released");
-        const title = String(input.title || "").trim();
-        if (!title) throw new Error("Event title required");
-        const chart = await tx.seatingChart.findUnique({ where: { id: input.seatingChartId } });
-        if (!chart || chart.roomId !== row.roomId || chart.status !== "published") throw new Error("Published room configuration required");
-        if (input.ageRestriction && !["all_ages", "16", "18", "21"].includes(input.ageRestriction)) throw new Error("Unknown age restriction");
-        const room = await tx.room.findUnique({ where: { id: row.roomId } });
-        const day = row.date.toISOString().slice(0, 10);
-        const showAt = input.showTime ? zonedDateTime(day, input.showTime, room?.timezone || "UTC") : new Date(input.showAt || row.date);
-        const doorsAt = input.doorsTime ? zonedDateTime(day, input.doorsTime, room?.timezone || "UTC") : new Date(input.doorsAt || row.date);
-        if (Number.isNaN(+showAt) || Number.isNaN(+doorsAt) || doorsAt > showAt) throw new Error("Doors must open before the show");
-        const event = await tx.event.create({ data: { title, roomId: row.roomId, seatingChartId: chart.id, showAt, doorsAt, status: "hold", promoterId: actor, ageRestriction: input.ageRestriction || "all_ages" } });
-        await transition(tx, "dateHold", row.id, row.status, "confirmed", actor, "", { eventId: event.id });
-        if (row.artistId) await tx.eventArtist.create({ data: { eventId: event.id, artistId: row.artistId, billing: "headliner", position: 1 } });
-        await audit("Event", event.id, { status: "hold" });
-        return { id: row.id, eventId: event.id, status: "confirmed" };
-      }
+      const audit = async (list45, id, after, reason = "") => appendAuditEvent(tx, actor, { action: operation, targetList: list45, targetId: id, after, reason });
+      if (["placeDateHold", "releaseDateHold", "challengeHold", "confirmHold"].includes(operation)) return runHoldCommand(operation, tx, input, actor);
       if (operation === "declineOffer") {
         const offer = await tx.offer.findUnique({ where: { id: input.offerId } });
         if (!offer) throw new Error("Offer not found");
@@ -3290,8 +3464,8 @@ function emailButton(label, href) {
 <a class="em-btn-a" href="${escapeHtml(href)}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${FONT};font-size:16px;font-weight:600;line-height:20px;color:${C.buttonText};text-decoration:none;border-radius:8px;">${escapeHtml(label)}</a>
 </td></tr></table>`;
 }
-function emailHeading(text42) {
-  return `<h2 class="em-text" style="margin:24px 0 12px;font-family:${FONT};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:${C.subtle};">${escapeHtml(text42)}</h2>`;
+function emailHeading(text44) {
+  return `<h2 class="em-text" style="margin:24px 0 12px;font-family:${FONT};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:${C.subtle};">${escapeHtml(text44)}</h2>`;
 }
 function emailItems(items) {
   const rows = items.map(
@@ -3406,7 +3580,7 @@ async function sendStoreMail(message) {
 // features/keystone/lib/order-mail.ts
 var FONT2 = "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif";
 var money = (cents2, currency = "USD") => new Intl.NumberFormat("en-US", { style: "currency", currency }).format((cents2 || 0) / 100);
-var at = (value, tz, o) => value ? new Intl.DateTimeFormat("en-US", { ...o, timeZone: tz || "America/Los_Angeles" }).format(new Date(value)) : "";
+var at2 = (value, tz, o) => value ? new Intl.DateTimeFormat("en-US", { ...o, timeZone: tz || "America/Los_Angeles" }).format(new Date(value)) : "";
 async function storeIdentity(context) {
   const row = await context.prisma.storeSettings.findFirst({ select: { name: true, supportEmail: true, supportPhone: true, refundPolicy: true } });
   return { name: row?.name || "Venue", supportEmail: row?.supportEmail || "", supportPhone: row?.supportPhone || "", refundPolicy: row?.refundPolicy || "" };
@@ -3429,7 +3603,7 @@ async function loadOrder(context, orderId) {
 function showLines(event) {
   if (!event) return "";
   const tz = event.room?.timezone;
-  const when = [at(event.showAt, tz, { weekday: "long", month: "long", day: "numeric", year: "numeric" }), event.doorsAt ? `Doors ${at(event.doorsAt, tz, { hour: "numeric", minute: "2-digit" })}` : "", event.showAt ? `Show ${at(event.showAt, tz, { hour: "numeric", minute: "2-digit", timeZoneName: "short" })}` : ""].filter(Boolean).join(" \xB7 ");
+  const when = [at2(event.showAt, tz, { weekday: "long", month: "long", day: "numeric", year: "numeric" }), event.doorsAt ? `Doors ${at2(event.doorsAt, tz, { hour: "numeric", minute: "2-digit" })}` : "", event.showAt ? `Show ${at2(event.showAt, tz, { hour: "numeric", minute: "2-digit", timeZoneName: "short" })}` : ""].filter(Boolean).join(" \xB7 ");
   const where = [event.room?.name, event.room?.address, event.room?.city].filter(Boolean).join(", ");
   const age = event.ageRestriction && event.ageRestriction !== "all_ages" ? `${event.ageRestriction}+ only. Bring ID.` : "";
   return `<p class="em-text" style="margin:0 0 4px;font-family:${FONT2};font-size:19px;line-height:26px;font-weight:700;color:#18181b;">${escapeHtml(event.title)}</p>
@@ -3499,7 +3673,7 @@ ${emailItems(order.ticketOrderLine_order.map((l) => ({ title: l.title, detail: [
 ${emailTotals(totals)}
 ${emailMuted(`From the order page you can see these tickets again and send one to someone else.${store.refundPolicy ? `<br><br>${escapeHtml(store.refundPolicy)}` : ""}`)}`
     });
-    const text42 = `Your order ${order.orderNumber} is confirmed.
+    const text44 = `Your order ${order.orderNumber} is confirmed.
 
 ${order.event?.title || ""}
 ${textTickets(tickets)}
@@ -3507,7 +3681,7 @@ ${textTickets(tickets)}
 Total ${money(order.totalCents, cur)}
 
 View order: ${url}`;
-    const result = await sendStoreMail({ to: order.guestEmail, storeName: store.name, subject: `Your ${count2} for ${order.event?.title || "the show"} (order ${order.orderNumber})`, html, text: text42, attachments: qr.attachments });
+    const result = await sendStoreMail({ to: order.guestEmail, storeName: store.name, subject: `Your ${count2} for ${order.event?.title || "the show"} (order ${order.orderNumber})`, html, text: text44, attachments: qr.attachments });
     if (result.sent) await prisma.ticketOrder.update({ where: { id: orderId }, data: { confirmationSentAt: /* @__PURE__ */ new Date(), confirmationMessageId: result.messageId || "" } });
     else {
       console.error("Order confirmation email failed:", orderId, result.error);
@@ -3538,12 +3712,12 @@ ${emailHeading("Ticket")}
 ${qr.html}
 ${emailMuted("Show the QR code at the door, on your phone or printed. It lets one person in, once. Keep this email: it is your ticket.")}`
     });
-    const text42 = `${order.guestName || "Someone"} sent you a ticket for ${order.event?.title || "a show"}.
+    const text44 = `${order.guestName || "Someone"} sent you a ticket for ${order.event?.title || "a show"}.
 
 ${textTickets([ticket])}
 
 Show this code at the door.`;
-    const result = await sendStoreMail({ to: ticket.holderEmail, storeName: store.name, subject: `Your ticket for ${order.event?.title || "the show"}`, html, text: text42, attachments: qr.attachments });
+    const result = await sendStoreMail({ to: ticket.holderEmail, storeName: store.name, subject: `Your ticket for ${order.event?.title || "the show"}`, html, text: text44, attachments: qr.attachments });
     if (!result.sent) console.error("Ticket transfer email failed:", input.orderId, result.error);
     return result;
   } catch (error) {
@@ -3873,7 +4047,7 @@ function editor(operation, permission, run) {
     const eventId = await eventOf(context.prisma, input);
     const data = input.data || {};
     return command(context, { operation, idempotencyKey: input.idempotencyKey, lock: `event:${eventId}`, params: { ...input, eventId } }, async (tx) => {
-      const audit = (list43, id, before, after, reason = "") => appendAuditEvent(tx, actor, { action: operation, targetList: list43, targetId: id, before, after, reason });
+      const audit = (list45, id, before, after, reason = "") => appendAuditEvent(tx, actor, { action: operation, targetList: list45, targetId: id, before, after, reason });
       return run(tx, { input, data, eventId, actor, audit });
     });
   };
@@ -4053,7 +4227,7 @@ function zoned(days, hour, timeZone) {
   instant = wall - offset(instant);
   return new Date(instant);
 }
-var at2 = (days, hour = 20) => {
+var at3 = (days, hour = 20) => {
   const d = new Date(Date.now() + days * DAY);
   d.setUTCHours(hour, 0, 0, 0);
   return d;
@@ -4116,12 +4290,12 @@ async function seedVenue(_, { section, data }, context) {
     if (section === "dateHold") {
       const room = await tx.room.findFirst({ where: { name: data.room } });
       const artist = await tx.artist.findFirst({ where: { name: data.artist } });
-      const date = at2(data.days, 0);
+      const date = at3(data.days, 0);
       const rankKey = `${room.id}:${date.toISOString().slice(0, 10)}:${data.rank}`;
       const existing = await tx.dateHold.findUnique({ where: { rankKey } });
       if (existing) return { id: existing.id };
       const event = data.confirmedTitle ? await tx.event.findFirst({ where: { title: data.confirmedTitle } }) : null;
-      const row = await tx.dateHold.create({ data: { roomId: room.id, artistId: artist?.id, date, rank: data.rank, rankKey, status: event ? "confirmed" : data.rank > 1 ? "challenged" : "held", expiresAt: at2(14), eventId: event?.id } });
+      const row = await tx.dateHold.create({ data: { roomId: room.id, artistId: artist?.id, date, rank: data.rank, rankKey, status: event ? "confirmed" : data.rank > 1 ? "challenged" : "held", expiresAt: at3(14), eventId: event?.id } });
       return { id: row.id };
     }
     throw new Error("Unknown setup section");
@@ -4135,13 +4309,13 @@ async function seedEvent(tx, e, actor) {
   const past = e.showDays < 0;
   const tz = room.timezone || "America/Los_Angeles";
   const showAt = zoned(e.showDays, 20, tz);
-  const event = await tx.event.create({ data: { title: e.title, roomId: room.id, seatingChartId: chart.id, promoterId: actor, doorsAt: zoned(e.showDays, 19, tz), showAt, curfewAt: zoned(e.showDays, 23, tz), ageRestriction: e.ageRestriction || "all_ages", status: "hold", announceAt: at2(e.showDays - 60), onSaleAt: e.status === "presale" ? at2(7) : at2(e.showDays - 55), presaleAt: e.presaleCode ? at2(-3) : null, presaleCode: e.presaleCode || "", allowReentry: false, description: e.origin || "" } });
+  const event = await tx.event.create({ data: { title: e.title, roomId: room.id, seatingChartId: chart.id, promoterId: actor, doorsAt: zoned(e.showDays, 19, tz), showAt, curfewAt: zoned(e.showDays, 23, tz), ageRestriction: e.ageRestriction || "all_ages", status: "hold", announceAt: at3(e.showDays - 60), onSaleAt: e.status === "presale" ? at3(7) : at3(e.showDays - 55), presaleAt: e.presaleCode ? at3(-3) : null, presaleCode: e.presaleCode || "", allowReentry: false, description: e.origin || "" } });
   const sectionByName = new Map(chart.chartSection_chart.map((s) => [s.name, s]));
   const levels = [];
   for (const l of e.levels) {
     const level = await tx.priceLevel.create({ data: { eventId: event.id, name: l.name, priceCents: l.priceCents, feeCents: l.feeCents, facilityFeeCents: room.defaultFacilityFeeCents, capacity: l.capacity, status: "active", perOrderLimit: 8, sections: { connect: l.sections.map((n) => ({ id: sectionByName.get(n).id })) } } });
     let sort = 0;
-    for (const p2 of l.phases || []) await tx.priceLevelPhase.create({ data: { priceLevelId: level.id, name: p2.name, priceCents: p2.priceCents, quantity: p2.quantity, sort: sort++, startsAt: at2(-30) } });
+    for (const p2 of l.phases || []) await tx.priceLevelPhase.create({ data: { priceLevelId: level.id, name: p2.name, priceCents: p2.priceCents, quantity: p2.quantity, sort: sort++, startsAt: at3(-30) } });
     levels.push({ ...level, sectionNames: l.sections, phases: await tx.priceLevelPhase.findMany({ where: { priceLevelId: level.id }, orderBy: { sort: "asc" } }) });
   }
   if (e.status !== "hold") {
@@ -4163,7 +4337,7 @@ async function seedEvent(tx, e, actor) {
   const stages = ["contracted", "accepted", "sent", "draft"];
   const index = ["p1", "p2", "p3"].includes(e.key) ? -1 : ["p4"].includes(e.key) ? -2 : Number(e.key.slice(1)) % stages.length;
   const offerStatus = index === -1 ? "settled" : index === -2 ? "contracted" : e.status === "hold" ? "draft" : stages[index];
-  const base = { eventId: event.id, artistId: headliner.id, eventArtistId: ea.id, ...e.deal, version: 1, depositDueAt: at2(e.showDays - 30), status: offerStatus };
+  const base = { eventId: event.id, artistId: headliner.id, eventArtistId: ea.id, ...e.deal, version: 1, depositDueAt: at3(e.showDays - 30), status: offerStatus };
   const offer = await tx.offer.create({ data: base });
   if (["accepted", "contracted", "settled"].includes(offerStatus)) {
     const terms = termsOf(offer);
@@ -4172,7 +4346,7 @@ async function seedEvent(tx, e, actor) {
   for (const x of e.expenses || []) await tx.eventExpense.create({ data: { eventId: event.id, category: x.category, budgetCents: x.budgetCents, actualCents: past || e.past ? x.actualCents : 0, isCapped: x.isCapped, vendor: x.vendor } });
   for (const h of e.productionHolds || []) {
     const level = levels.find((l) => l.name === h.level);
-    const hold = await tx.productionHold.create({ data: { eventId: event.id, priceLevelId: level.id, quantity: h.quantity, holdType: h.holdType, status: "active", releaseAt: at2(e.showDays - 7) } });
+    const hold = await tx.productionHold.create({ data: { eventId: event.id, priceLevelId: level.id, quantity: h.quantity, holdType: h.holdType, status: "active", releaseAt: at3(e.showDays - 7) } });
     const open = await tx.seatInventory.findMany({ where: { eventId: event.id, priceLevelId: level.id, status: "open" }, orderBy: { id: "asc" }, take: h.quantity });
     for (const s of open) await tx.seatInventory.update({ where: { id: s.id }, data: { status: "reserved_hold", occupancyKey: `${event.id}:${s.seatId}` } });
     if (open.length) await tx.productionHold.update({ where: { id: hold.id }, data: { seats: { connect: open.map((s) => ({ id: s.id })) } } });
@@ -4204,7 +4378,7 @@ async function seedEvent(tx, e, actor) {
       await tx.offer.updateMany({ where: { eventId: event.id }, data: { status: "settled" } });
     }
   }
-  await tx.event.update({ where: { id: event.id }, data: { status: e.past ? e.past.settlement === "final" ? "settled" : e.past.settlement ? "settling" : target : target, refundWindowEndsAt: e.status === "postponed" ? at2(30) : null } });
+  await tx.event.update({ where: { id: event.id }, data: { status: e.past ? e.past.settlement === "final" ? "settled" : e.past.settlement ? "settling" : target : target, refundWindowEndsAt: e.status === "postponed" ? at3(30) : null } });
   await appendAuditEvent(tx, actor, { action: "onboarding.event", targetList: "Event", targetId: event.id, after: { status: e.status } });
   return { id: event.id };
 }
@@ -4309,15 +4483,15 @@ function chain(error) {
 }
 function constraintRefusal(error) {
   for (const link of chain(error)) {
-    const text42 = [
+    const text44 = [
       link?.message,
       typeof link?.meta === "object" ? JSON.stringify(link.meta) : "",
       link?.extensions?.debug?.message ?? "",
       link?.extensions?.prisma?.meta ? JSON.stringify(link.extensions.prisma.meta) : ""
     ].join(" ");
-    for (const [name2, rule] of Object.entries(CONSTRAINT_MESSAGES)) if (text42.includes(name2)) return rule;
+    for (const [name2, rule] of Object.entries(CONSTRAINT_MESSAGES)) if (text44.includes(name2)) return rule;
     const listed = /Unique constraint failed on the fields: \((.*?)\)(?:\s|$)/.exec(String(link?.message || ""))?.[1]?.match(/`([^`]+)`/g)?.map((field) => field.slice(1, -1));
-    const keyed = /Key \((.*?)\)=\(.*\) already exists/.exec(text42)?.[1]?.split(",").map((field) => field.trim().replace(/^"|"$/g, ""));
+    const keyed = /Key \((.*?)\)=\(.*\) already exists/.exec(text44)?.[1]?.split(",").map((field) => field.trim().replace(/^"|"$/g, ""));
     const unwrap = (field) => String(field).replace(/^lower\((.*)\)$/, "$1");
     const fields = (link?.code === "P2002" && Array.isArray(link?.meta?.target) ? link.meta.target : listed ?? keyed)?.map(unwrap);
     if (fields?.length) {
@@ -4334,16 +4508,16 @@ function constraintGraphQLError(error, refusal) {
 }
 
 // features/keystone/mutations/hidden.ts
-async function setRecordHidden(_, { list: list43, id, hidden, reason }, context) {
+async function setRecordHidden(_, { list: list45, id, hidden, reason }, context) {
   if (!permissions.canManagePeople({ session: context.session })) throw new Error("Only staff who manage people can hide records");
-  const model = list43 === "TicketOrder" ? "ticketOrder" : list43 === "User" ? "user" : null;
+  const model = list45 === "TicketOrder" ? "ticketOrder" : list45 === "User" ? "user" : null;
   if (!model) throw new Error("Only orders and accounts can be hidden");
   if (model === "user" && id === context.session.itemId && hidden) throw new Error("You cannot hide your own account");
   const before = await context.prisma[model].findUnique({ where: { id: String(id) }, select: { id: true, hiddenAt: true } });
   if (!before) throw new Error("Record not found");
   const hiddenAt = hidden ? before.hiddenAt || /* @__PURE__ */ new Date() : null;
   await context.prisma[model].update({ where: { id: before.id }, data: { hiddenAt } });
-  await appendAuditEvent(context.prisma, context.session.itemId, { action: hidden ? "record.hidden" : "record.unhidden", targetList: list43, targetId: before.id, before: { hiddenAt: before.hiddenAt }, after: { hiddenAt }, reason: String(reason || "").slice(0, 500) });
+  await appendAuditEvent(context.prisma, context.session.itemId, { action: hidden ? "record.hidden" : "record.unhidden", targetList: list45, targetId: before.id, before: { hiddenAt: before.hiddenAt }, after: { hiddenAt }, reason: String(reason || "").slice(0, 500) });
   return { id: before.id, hiddenAt };
 }
 
@@ -4791,6 +4965,97 @@ async function retryTicketRefund(_, { input }, context) {
   return finishTicketRefund(context, { refundId: refund.id, paymentId: refund.paymentId, orderId: refund.orderId, actor: context.session.itemId, reason: refund.reason }, result);
 }
 
+// features/keystone/lib/inquiries.ts
+var INQUIRY_KINDS = ["show", "private_event"];
+var INQUIRY_MOVES = { new: ["in_progress", "won", "lost"], in_progress: ["won", "lost"], won: [], lost: [] };
+var EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+function validateInquiry(input) {
+  const kind = String(input?.kind || "show");
+  if (!INQUIRY_KINDS.includes(kind)) throw new Error("Choose show or private event");
+  const name2 = String(input?.name || "").trim().slice(0, 200);
+  const email = String(input?.email || "").trim().toLowerCase().slice(0, 320);
+  if (!name2) throw new Error("Name required");
+  if (!EMAIL.test(email)) throw new Error("A valid email is required");
+  const message = String(input?.message || "").trim().slice(0, 5e3);
+  if (!message) throw new Error("Tell us a little about the event");
+  let dateWanted = null;
+  if (input?.dateWanted) {
+    dateWanted = new Date(input.dateWanted);
+    if (Number.isNaN(+dateWanted)) throw new Error("Valid date required");
+  }
+  const intOrNull = (v, label) => {
+    if (v === void 0 || v === null || v === "") return null;
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 0) throw new Error(`${label} must be a whole number`);
+    return n;
+  };
+  return {
+    kind,
+    name: name2,
+    email,
+    message,
+    dateWanted,
+    phone: String(input?.phone || "").trim().slice(0, 60),
+    company: String(input?.company || "").trim().slice(0, 200),
+    eventType: String(input?.eventType || "").trim().slice(0, 120),
+    source: String(input?.source || "").trim().slice(0, 120),
+    flexibleDates: Boolean(input?.flexibleDates),
+    guests: intOrNull(input?.guests, "Guests"),
+    budgetCents: intOrNull(input?.budgetCents, "Budget")
+  };
+}
+function inquiryMove(from, to, reason) {
+  if (!(INQUIRY_MOVES[from] || []).includes(to)) throw new Error(`An inquiry that is ${from.replace(/_/g, " ")} cannot become ${to.replace(/_/g, " ")}`);
+  if (to === "lost" && !reason.trim()) throw new Error("Say why it was lost");
+}
+
+// features/keystone/mutations/inquiries.ts
+async function submitInquiry(_, { input }, context) {
+  if (!input?.idempotencyKey) throw new Error("Idempotency key required");
+  if (String(input.website || "").trim()) return { id: null, status: "new" };
+  const data = validateInquiry(input);
+  if (input.roomId && !await context.prisma.room.findUnique({ where: { id: input.roomId } })) throw new Error("Room not found");
+  return command(context, { operation: "submitInquiry", idempotencyKey: input.idempotencyKey, lock: `inquiry:${data.email}`, params: { ...input, data } }, async (tx) => {
+    const recent = await tx.inquiry.count({ where: { email: data.email, createdAt: { gt: new Date(Date.now() - 36e5) } } });
+    if (recent >= 5) throw new Error("Too many requests from this email. Please wait an hour or call us.");
+    const row = await tx.inquiry.create({ data: { ...data, roomId: input.roomId || null, status: "new" } });
+    await appendAuditEvent(tx, null, { action: "submitInquiry", targetList: "Inquiry", targetId: row.id, after: { kind: row.kind } });
+    return { id: row.id, status: row.status };
+  });
+}
+async function workInquiry(_, { input }, context) {
+  authorize(context, "canManageInquiries");
+  if (!input?.idempotencyKey) throw new Error("Idempotency key required");
+  const actor = context.session.itemId;
+  return command(context, { operation: "workInquiry", idempotencyKey: input.idempotencyKey, lock: `inquiry-row:${input.inquiryId}`, params: input }, async (tx) => {
+    const row = await tx.inquiry.findUnique({ where: { id: input.inquiryId } });
+    if (!row) throw new Error("Inquiry not found");
+    const to = String(input.status || "");
+    inquiryMove(row.status, to, String(input.reason || ""));
+    const count2 = await tx.inquiry.updateMany({ where: { id: row.id, status: row.status }, data: { status: to, handledById: actor, lostReason: to === "lost" ? String(input.reason).trim() : row.lostReason, promoterId: input.promoterId || row.promoterId } });
+    if (count2.count !== 1) throw new Error("Inquiry changed; reload it");
+    await appendAuditEvent(tx, actor, { action: `${row.status}:${to}`, targetList: "Inquiry", targetId: row.id, before: { status: row.status }, after: { status: to }, reason: String(input.reason || "") });
+    return { id: row.id, status: to };
+  });
+}
+async function roomAvailability(_, { roomId, from, days }, context) {
+  const start = new Date(holdDay(from || (/* @__PURE__ */ new Date()).toISOString()));
+  const span = Math.min(Math.max(Number(days) || 60, 1), 400);
+  const end = new Date(+start + span * 864e5);
+  const now = /* @__PURE__ */ new Date();
+  const [holds, events] = await Promise.all([
+    context.prisma.dateHold.findMany({ where: { roomId, date: { gte: start, lt: end }, status: { in: ["held", "challenged", "confirmed"] } }, select: { id: true, date: true, status: true, rank: true, expiresAt: true, challengeDeadline: true } }),
+    context.prisma.event.findMany({ where: { roomId, showAt: { gte: start, lt: end }, status: { notIn: ["cancelled"] } }, select: { showAt: true } })
+  ]);
+  const eventDays = new Set(events.map((e) => e.showAt.toISOString().slice(0, 10)));
+  const out = [];
+  for (let i = 0; i < span; i++) {
+    const day = new Date(+start + i * 864e5).toISOString().slice(0, 10);
+    out.push({ date: day, state: dayState(holds.filter((h) => h.date.toISOString().slice(0, 10) === day), eventDays.has(day), now) });
+  }
+  return out;
+}
+
 // features/keystone/mutations/customers.ts
 var confirmKey = (userId, email) => `confirm-${userId}-${digest(email.toLowerCase()).slice(0, 24)}`;
 async function sendEmailConfirmation(_, __, context) {
@@ -4850,7 +5115,7 @@ function extendGraphqlSchema(baseSchema) {
   return (0, import_schema.mergeSchemas)({
     schemas: [baseSchema],
     typeDefs: graphql28`
-      input OperatorCommandInput { idempotencyKey: String! eventId: ID roomId: ID date: String rank: Int artistId: ID agencyId: ID expiresAt: String holdId: ID phaseId: ID expenseId: ID data: JSON offerId: ID settlementId: ID productionHoldId: ID seatingChartId: ID title: String showAt: String doorsAt: String showTime: String doorsTime: String ageRestriction: String levelId: ID quantity: Int seatInventoryIds: [ID!] holdType: String releaseAt: String token: String ticketCode: String gate: String softGrossCents: Int hardGrossCents: Int sellerFeeCents: Int countIn: JSON countOut: JSON amountCents: Int reason: String approvedById: ID kind: String method: String reference: String status: String }
+      input OperatorCommandInput { idempotencyKey: String! eventId: ID roomId: ID date: String rank: Int artistId: ID agencyId: ID expiresAt: String holdId: ID byHoldId: ID promoterId: ID notes: String phaseId: ID expenseId: ID data: JSON offerId: ID settlementId: ID productionHoldId: ID seatingChartId: ID title: String showAt: String doorsAt: String showTime: String doorsTime: String ageRestriction: String levelId: ID quantity: Int seatInventoryIds: [ID!] holdType: String releaseAt: String token: String ticketCode: String gate: String softGrossCents: Int hardGrossCents: Int sellerFeeCents: Int countIn: JSON countOut: JSON amountCents: Int reason: String approvedById: ID kind: String method: String reference: String status: String }
       input UserUpdateProfileInput { email: String name: String password: String onboardingStatus: String }
       input CreateHoldInput { idempotencyKey: String! }
       input StartTicketCheckoutInput { holdId: ID! proof: String! email: String! name: String! ageAttested: Boolean idempotencyKey: String! }
@@ -4873,6 +5138,7 @@ function extendGraphqlSchema(baseSchema) {
         lookupTicketOrder(email: String!, orderNumber: String!): JSON
         ticketOrderView(orderId: ID!, proof: String): JSON
         myTicketOrders: JSON
+        roomAvailability(roomId: ID!, from: String, days: Int): JSON
       }
       type Mutation {
         createGaHold(eventId: ID!, levelId: ID!, qty: Int!, presaleCode: String, idempotencyKey: String!): JSON
@@ -4884,6 +5150,8 @@ function extendGraphqlSchema(baseSchema) {
         retryTicketRefund(input: RetryTicketRefundInput!): JSON
         resendOrderConfirmation(orderId: ID!): JSON
         setRecordHidden(list: String!, id: ID!, hidden: Boolean!, reason: String): JSON
+        submitInquiry(input: JSON!): JSON
+        workInquiry(input: JSON!): JSON
         sendEmailConfirmation: JSON
         confirmCustomerEmail(userId: ID!, proof: String!): JSON
         updateActiveUser(data: UserUpdateProfileInput!): User
@@ -4910,7 +5178,8 @@ function extendGraphqlSchema(baseSchema) {
         eventAvailability: surfaceRefusals(availability),
         lookupTicketOrder: surfaceRefusals(lookupTicketOrder),
         ticketOrderView: surfaceRefusals(ticketOrderView),
-        myTicketOrders: surfaceRefusals(myTicketOrders)
+        myTicketOrders: surfaceRefusals(myTicketOrders),
+        roomAvailability: surfaceRefusals(roomAvailability)
       },
       Mutation: surfaced({
         createGaHold: createHold,
@@ -4927,6 +5196,8 @@ function extendGraphqlSchema(baseSchema) {
         closeCashDrawer,
         forceCloseCashDrawer,
         updateActiveUser: updateActiveUser_default,
+        submitInquiry,
+        workInquiry,
         startTicketCheckout,
         completeTicketCheckout,
         transferTicket,
@@ -5130,7 +5401,7 @@ var { withAuth } = (0, import_auth.createAuth)({
   `
 });
 var keystone_default = withAuth(
-  (0, import_core46.config)({
+  (0, import_core48.config)({
     db: {
       provider: "postgresql",
       url: pooledDatabaseUrl(databaseURL),

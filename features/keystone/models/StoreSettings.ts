@@ -17,6 +17,10 @@ export const StoreSettings = list({
   supportPhone: text({}),
   refundPolicy: text({ ui: { displayMode: 'textarea' } }),
   currencyCode: text({ defaultValue: 'USD', validation: { match: { regex: /^[A-Z]{3}$/, explanation: 'ISO 4217 currency code' } } }),
+  // Calendar (holds and challenges).
+  challengeBusinessDays: integer({ defaultValue: 1, validation: { min: 0, max: 30 } }),
+  challengeCountsWeekends: checkbox({ defaultValue: false }),
+  holdExpiryDays: integer({ defaultValue: 7, validation: { min: 1, max: 365 } }),
   ...storeLogoFields,
   ...trackingFields,
  }

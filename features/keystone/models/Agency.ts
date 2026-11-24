@@ -4,7 +4,7 @@ import { trackingFields } from './trackingFields';
 import { commandAccess, catalogAccessFor, permissions } from '../access';
 
 export const Agency = list({
- access: catalogAccessFor('canManageArtists'),
+ access: catalogAccessFor('canManageContacts'),
  
  fields: {
   name: text({}),

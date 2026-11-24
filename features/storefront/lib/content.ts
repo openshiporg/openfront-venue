@@ -60,3 +60,14 @@ export async function listedShow(id: string): Promise<Show | null> {
 // Support acts already named in the title ("Velvet Harbor + Saint Juno") are not repeated.
 export const billLine = (s: Show) => { const t = s.title.toLowerCase(); const support = s.artists.slice(1).map((a) => a.name).filter((n) => !t.includes(n.toLowerCase())); return support.length ? `With ${support.join(', ')}` : ''; };
 export const genreOf = (s: Show) => s.artists[0]?.genre || '';
+
+/** Room names for the request form. Server only, fixed fields. */
+export async function roomChoices(): Promise<{ id: string; name: string }[]> {
+  try {
+    const rows = (await keystoneContext.sudo().query.Room.findMany({ orderBy: [{ name: 'asc' }], take: 50, query: 'id name' })) as readonly any[];
+    return rows.map((r) => ({ id: r.id, name: r.name }));
+  } catch (error) {
+    console.error('Storefront rooms failed:', error instanceof Error ? error.message : 'unknown');
+    return [];
+  }
+}
